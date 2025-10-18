@@ -68,7 +68,7 @@ export default defineConfig({
         text: '学习笔记',
         collapsed: false,
         items: [
-          { text: 'C++基础入门', link: '/notes/basic' }
+          { text: 'C++基础入门', link: '/notes/basic-cpp' }
         ]
       }
     ],

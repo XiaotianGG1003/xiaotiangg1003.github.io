@@ -20,19 +20,19 @@ outline: deep
 #### 1.1.1 创建项目
 Visual Studio是我们用来编写C++程序的主要工具，我们先将它打开
 
-![](assets/1.png)
-![](assets/2.png)
+![](../assets/notes/basic_cpp/1.png)
+![](../assets/notes/basic_cpp/2.png)
 
 
 
 #### 1.1.2 创建文件
 右键源文件，选择添加->新建项
 
-![](assets/3.png)
+![](../assets/notes/basic_cpp/3.png)
 
 给C++文件起个名称，然后点击添加即可。
 
-![](assets/4.png)
+![](../assets/notes/basic_cpp/4.png)
 
 
 
@@ -56,7 +56,7 @@ int main() {
 
 #### 1.1.4 运行程序
 
-![](assets/5.png)
+![](../assets/notes/basic_cpp/5.png)
 
 
 
@@ -920,7 +920,7 @@ if语句的三种形式
 
 1. 单行格式if语句：`if(条件){ 条件满足执行的语句 }`
 
-   ![](assets/6.png)
+   ![](../assets/notes/basic_cpp/6.png)
 
    示例：
 
@@ -955,7 +955,7 @@ if语句的三种形式
 
 2. 多行格式if语句：`if(条件){ 条件满足执行的语句 }else{ 条件不满足执行的语句 };`
 
-![](assets/7.png)
+![](../assets/notes/basic_cpp/7.png)
 
 ​
 
@@ -988,7 +988,7 @@ int main() {
 
 3. 多条件的if语句：`if(条件1){ 条件1满足执行的语句 }else if(条件2){条件2满足执行的语句}... else{ 都不满足执行的语句}`
 
-![](assets/8.png)
+![](../assets/notes/basic_cpp/8.png)
 
 
 示例：
@@ -1088,7 +1088,7 @@ int main() {
 **练习案例：** 三只小猪称体重
 
 有三只小猪ABC，请分别输入三只小猪的体重，并且判断哪只小猪最重？
-![](assets/9.jpg)
+![](../assets/notes/basic_cpp/9.jpg)
 
 
 
@@ -1216,7 +1216,7 @@ int main() {
 
 **解释：**==只要循环条件的结果为真，就执行循环语句==
 
-![](assets/10.png)
+![](../assets/notes/basic_cpp/10.png)
 
 
 **示例：**
@@ -1246,7 +1246,7 @@ int main() {
 
 **案例描述：** 系统随机生成一个1到100之间的数字，玩家进行猜测，如果猜错，提示玩家数字过大或过小，如果猜对恭喜玩家胜利，并且退出游戏。
 
-![](assets/11.jpg)
+![](../assets/notes/basic_cpp/11.jpg)
 
 
 
@@ -1258,7 +1258,7 @@ int main() {
 
 **注意：** 与while的区别在于==do...while会先执行一次循环语句==，再判断循环条件
 
-![](assets/12.png)
+![](../assets/notes/basic_cpp/12.png)
 
 
 **示例：**
@@ -1322,7 +1322,7 @@ int main() {
 
 **详解：**
 
-![](assets/13.png)
+![](../assets/notes/basic_cpp/13.png)
 
 
 
@@ -1336,7 +1336,7 @@ int main() {
 
 案例描述：从1开始数到数字100， 如果数字个位含有7，或者数字十位含有7，或者该数字是7的倍数，我们打印敲桌子，其余数字直接打印输出。
 
-![](assets/14.gif)
+![](../assets/notes/basic_cpp/14.gif)
 
 
 
@@ -1346,7 +1346,7 @@ int main() {
 
 例如我们想在屏幕中打印如下图片，就需要利用嵌套循环
 
-![](assets/15.png)
+![](../assets/notes/basic_cpp/15.png)
 
 
 **示例：**
@@ -1376,7 +1376,7 @@ int main() {
 
 案例描述：利用嵌套循环，实现九九乘法表
 
-![](assets/16.jpg)
+![](../assets/notes/basic_cpp/16.jpg)
 
 
 
@@ -1549,7 +1549,7 @@ int main() {
 
 **特点2：** 数组是由==连续的内存==位置组成的
 
-![](assets/17.png)
+![](../assets/notes/basic_cpp/17.png)
 
 
 
@@ -1691,7 +1691,7 @@ int main() {
 2. 对每一对相邻元素做同样的工作，执行完毕后，找到第一个最大值。
 3. 重复以上的步骤，每次比较次数-1，直到不需要比较
 
-![](assets/18.png)
+![](../assets/notes/basic_cpp/18.png)
 
 **示例：** 将数组 { 4,2,8,0,5,7,1,3,9 } 进行升序排序
 
@@ -1729,7 +1729,7 @@ int main() {
 
 二维数组就是在一维数组上，多加一个维度。
 
-![](assets/19.png)
+![](../assets/notes/basic_cpp/19.png)
 
 #### 5.3.1 二维数组定义方式
 
