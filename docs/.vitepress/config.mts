@@ -95,7 +95,8 @@ function sidebar(): DefaultTheme.SidebarItem[] {
         items: [
           { text: 'C++基础入门', link: '/notes/basic-cpp' },
           { text: 'Git常用指令', link: '/notes/git' },
-          { text: 'JVM', link: '/notes/jvm' }
+          { text: 'JVM', link: '/notes/jvm' },
+          { text: '算法基础', link: '/notes/basic-algorithm' }
         ]
       }
     ]
