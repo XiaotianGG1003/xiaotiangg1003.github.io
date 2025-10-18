@@ -65,7 +65,7 @@ export default defineConfig({
 
 function nav(): DefaultTheme.NavItem[] {
   return [
-      { text: "💭 Blogs", link: "/blogs/index" },
+      { text: "💭 Blogs", link: "/blogs/docker" },
       { text: "📝 Notes", link: "/notes/basic-cpp" },
       { text: "👋 About", link: "/about.md" },
       { text: 'Examples', link: '/markdown-examples' }
@@ -83,10 +83,19 @@ function sidebar(): DefaultTheme.SidebarItem[] {
         ]
       },
       {
+        text: '博客文章',
+        collapsed: false,
+        items: [
+          { text: 'Docker基本操作', link: '/blogs/docker' }
+        ]
+      },
+      {
         text: '学习笔记',
         collapsed: false,
         items: [
-          { text: 'C++基础入门', link: '/notes/basic-cpp' }
+          { text: 'C++基础入门', link: '/notes/basic-cpp' },
+          { text: 'Git常用指令', link: '/notes/git' },
+          { text: 'JVM', link: '/notes/jvm' }
         ]
       }
     ]
