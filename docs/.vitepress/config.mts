@@ -33,7 +33,7 @@ export default defineConfig({
     // 更新时间戳
     lastUpdated: {
       text: '最后更新于',
-      formatOptions: { dateStyle: 'full', timeStyle: 'medium' }
+      formatOptions: { dateStyle: 'long', timeStyle: 'short' }
     },
     docFooter: { prev: '上一页', next: '下一页' },
     footer: {
