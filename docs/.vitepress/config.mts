@@ -2,8 +2,8 @@ import { defineConfig, type DefaultTheme } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  title: "xtao's blog",
-  description: "xtao's blog",
+  title: "xtao's Blog",
+  description: "xtao's Blog",
   // 标签上的图标
   head: [['link', { rel: 'icon', href: '/icon.svg' }]],
   lang: 'zh-CN',
