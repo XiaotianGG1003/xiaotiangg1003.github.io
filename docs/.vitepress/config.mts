@@ -55,7 +55,25 @@ export default defineConfig({
 
     nav: nav(),
 
-    sidebar: [
+    sidebar: sidebar(),
+
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/XiaotianGG1003' }
+    ]
+  }
+})
+
+function nav(): DefaultTheme.NavItem[] {
+  return [
+      { text: "💭 Blogs", link: "/blogs/index" },
+      { text: "📝 Notes", link: "/notes/basic-cpp" },
+      { text: "👋 About", link: "/about.md" },
+      { text: 'Examples', link: '/markdown-examples' }
+  ]
+}
+
+function sidebar(): DefaultTheme.SidebarItem[] {
+  return [
       {
         text: 'Examples',
         collapsed: false,
@@ -71,19 +89,5 @@ export default defineConfig({
           { text: 'C++基础入门', link: '/notes/basic-cpp' }
         ]
       }
-    ],
-
-    socialLinks: [
-      { icon: 'github', link: 'https://github.com/vuejs/vitepress' }
     ]
-  }
-})
-
-function nav(): DefaultTheme.NavItem[] {
-  return [
-      { text: "💭 Blogs", link: "/Notes/index" },
-      { text: "📝 Notes", link: "/Notes/index" },
-      { text: "👋 About", link: "/AboutMe.md" },
-      { text: 'Examples', link: '/markdown-examples' }
-  ]
 }
