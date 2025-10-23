@@ -85,7 +85,8 @@ function sidebar(): DefaultTheme.SidebarItem[] {
         text: '博客文章',
         collapsed: false,
         items: [
-          { text: 'Docker基本操作', link: '/blogs/docker' }
+          { text: 'Docker基本操作', link: '/blogs/docker' },
+          { text: 'frp内网穿透搭建', link: '/blogs/frp' },
         ]
       },
       {
