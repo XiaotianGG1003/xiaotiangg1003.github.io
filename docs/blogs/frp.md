@@ -39,7 +39,7 @@ bindPort = 7000
 vhostHTTPPort = 8080
 ```
 
-1. 在 /etc/systemd/system 目录下创建一个 frps.service 文件，用于配置 frps 服务。
+3. 在 /etc/systemd/system 目录下创建一个 frps.service 文件，用于配置 frps 服务。
 ![frps-service](../assets/blogs/frp/QQ20251023-210856.jpg)
 写入内容
 ```sh
@@ -113,13 +113,12 @@ customDomains = ["test.xtao.site"]
 当然，test.xtao.site和cloud.xtao.site可以是两个完全不同的域名
 :::
 
-6.如果你认为需要加上端口比较麻烦，可以使用nginx反向代理实现无端口访问。
-1. 在宝塔中安装nginx
-2. 启动nginx,添加反向代理如下
+6. 如果你认为需要加上端口比较麻烦，可以使用nginx反向代理实现无端口访问。
+   * 在宝塔中安装nginx，启动nginx,添加反向代理如下
 ![反向代理](../assets/blogs/frp/QQ20251023-234003.jpg)
 
 ## 总结
-frp可以通过借助拥有外网IP的机器，实现外网访问内网中的服务。过程如下，浏览器输入域名后，DNS解析到服务器地址，nginx反向代理会根据你访问的域名匹配server块(如果使用的是ip访问,而且你也没有为ip设置server块,则会匹配默认server块,如果没有默认则会转发到第一个server块)，文中都转发到了`127.0.0.1:8080`即frp用于接收内网穿透的 HTTP 流量的端口。通过内网穿透结合客户端中`customDomains` 的配置即可访问到本地不同的web服务。
+frp可以通过借助拥有外网IP的机器，实现外网访问内网中的服务。过程如下，浏览器输入域名后，DNS解析到服务器地址，nginx反向代理会根据你访问的域名匹配server块(如果使用的是ip访问,而且你也没有为ip设置server块,则会匹配默认server块,如果没有默认则会转发到第一个server块)，反向代理都转发到了`127.0.0.1:8080`即frp用于接收内网穿透的 HTTP 流量的端口。通过内网穿透结合客户端中`customDomains` 的配置即可访问到本地不同的web服务。
 ```sh
 # 宝塔nginx默认块
 server
