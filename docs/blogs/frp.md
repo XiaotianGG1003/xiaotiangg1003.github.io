@@ -129,3 +129,18 @@ server
     root /www/server/nginx/html;
 }
 ```
+
+## 优化
+部署完成后我发现访问速度很慢，下载视频只有100多KB/S的速度，根本跑不满带宽，经过摸索排查，网上搜了几种优化方法，使用后有所改善。
+* 经测试关闭nginx反向代理有所改善(原因未知)。关闭后直接将frps配置中监听端口改为80
+* 使用kcp协议，增加传输线程池数量，frps中添加配置
+    ```sh
+    kcpBindPort = 7000
+    transport.maxPoolCount = 50
+    ```
+    frpc中添加
+    ```sh
+    transport.protocol = "kcp"
+    transport.useCompression = true
+    ```
+* 
