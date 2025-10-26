@@ -115,6 +115,7 @@ customDomains = ["test.xtao.site"]
 
 6. 如果你认为需要加上端口比较麻烦，可以使用nginx反向代理实现无端口访问。
    * 在宝塔中安装nginx，启动nginx,添加反向代理如下
+   * 这样直接将80端口转发到8080
 ![反向代理](../assets/blogs/frp/QQ20251023-234003.jpg)
 
 ## 总结
@@ -132,7 +133,7 @@ server
 
 ## 优化
 部署完成后我发现访问速度很慢，下载视频只有100多KB/S的速度，根本跑不满带宽，经过摸索排查，网上搜了几种优化方法，使用后有所改善。
-* 经测试关闭nginx反向代理有所改善(原因未知)。关闭后直接将frps配置中监听端口改为80
+* 经测试关闭nginx反向代理有所改善(原因未知)。关闭后直接将frps配置中HTTP监听端口改为80
 * 使用kcp协议，增加传输线程池数量，frps中添加配置
     ```sh
     kcpBindPort = 7000
@@ -141,6 +142,37 @@ server
     frpc中添加
     ```sh
     transport.protocol = "kcp"
-    transport.useCompression = true
     ```
-* 
+
+## 改用HTTPS
+为本地 HTTP 服务启用 HTTPS
+1. 配置frps.toml
+ ```sh
+bindPort = 7000
+vhostHTTPPort = 80
+vhostHTTPSPort = 443
+kcpBindPort = 7000
+transport.maxPoolCount = 50
+ ```
+2. 配置frpc.toml
+```sh
+serverAddr = "x.x.x.x"
+serverPort = 7000
+transport.protocol = "kcp"
+
+
+[[proxies]]
+name = "cloud_htts2http"
+type = "https"
+customDomains = ["cloud.xtao.site"]
+
+[proxies.plugin]
+type = "https2http"
+localAddr = "127.0.0.1:5212"
+
+# HTTPS 证书相关的配置
+crtPath = "./cloud.xtao.site.crt"
+keyPath = "./cloud.xtao.site.key"
+hostHeaderRewrite = "127.0.0.1"
+requestHeaders.set.x-from-where = "frp"
+```
