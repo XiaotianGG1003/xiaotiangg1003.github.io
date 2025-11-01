@@ -139,7 +139,7 @@ server
     kcpBindPort = 7000
     transport.maxPoolCount = 50
     ```
-    frpc中添加
+* frpc中添加
     ```sh
     transport.protocol = "kcp"
     ```
