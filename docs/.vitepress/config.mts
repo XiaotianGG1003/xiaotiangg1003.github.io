@@ -93,6 +93,7 @@ function sidebar(): DefaultTheme.SidebarItem[] {
         text: '学习笔记',
         collapsed: false,
         items: [
+          { text: 'Linux系统编程', link: 'notes/linux'},
           { text: '算法基础', link: '/notes/basic-algorithm' },
           { text: 'C++基础入门', link: '/notes/basic-cpp' },
           { text: 'Git常用指令', link: '/notes/git' },
