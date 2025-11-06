@@ -35,6 +35,21 @@ git push -u origin main
 
 ```bash
 git remote add origin https://github.com/XiaotianGG1003/test.git
+// 重命名分支为main
 git branch -M main
+// 推送main分支到远程仓库
 git push -u origin main
+```
+
+**本地分支改名同步到远程分支**
+本地改名不会自动影响远程分支
+```bash
+// 重命名本地分支
+git branch -m old-name new-name
+// : 表示“推送空分支”，即删除远程分支
+git push origin :old-name
+// 推送新分支
+git push origin new-name
+// 关联本地分支与远程新分支,否则本地git push/git pull可能会报错
+git branch -u origin/new-name
 ```
