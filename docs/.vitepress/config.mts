@@ -29,7 +29,7 @@ export default defineConfig({
       } 
     },
     // 大纲显示
-    outline: { level: 2, label: '页面导航'},
+    outline: { level: [2, 3], label: '页面导航'},
     // 更新时间戳
     lastUpdated: {
       text: '最后更新于',
@@ -66,7 +66,7 @@ export default defineConfig({
 function nav(): DefaultTheme.NavItem[] {
   return [
       { text: "💭 Blogs", link: "/blogs/docker" },
-      { text: "📝 Notes", link: "/notes/basic-algorithm" },
+      { text: "📝 Notes", link: "/notes/linux" },
       { text: "👋 About", link: "/about.md" }
   ]
 }
@@ -93,7 +93,7 @@ function sidebar(): DefaultTheme.SidebarItem[] {
         text: '学习笔记',
         collapsed: false,
         items: [
-          { text: 'Linux系统编程', link: 'notes/linux'},
+          { text: 'Linux系统编程', link: '/notes/linux'},
           { text: '算法基础', link: '/notes/basic-algorithm' },
           { text: 'C++基础入门', link: '/notes/basic-cpp' },
           { text: 'Git常用指令', link: '/notes/git' },
