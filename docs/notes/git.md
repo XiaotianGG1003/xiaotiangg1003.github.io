@@ -4,10 +4,16 @@ title: Git常用指令
 
 # Git常用指令
 
-<!-- more -->
+## 设置用户名和邮箱
+```bash
+// 查看设置
+git config --list --show-origin
+// 设置姓名和邮箱
+git config --global user.name "John Doe"
+git config --global user.email johndoe@example.com
+```
 
-**新建仓库并推送到远程仓库**
-
+## 新建仓库并推送到远程仓库
 ```bash
 echo "# test" >> README.md
 // 初始化仓库
@@ -29,10 +35,7 @@ git remote add origin https://github.com/XiaotianGG1003/test.git
 git push -u origin main
 ```
 
-<br />
-
-**推送本地仓库到远程仓库**
-
+## 推送本地仓库到远程仓库
 ```bash
 git remote add origin https://github.com/XiaotianGG1003/test.git
 // 重命名分支为main
@@ -41,8 +44,8 @@ git branch -M main
 git push -u origin main
 ```
 
-**本地分支改名同步到远程分支**
-本地改名不会自动影响远程分支
+## 本地分支改名同步到远程分支
+* 本地改名不会自动影响远程分支
 ```bash
 // 重命名本地分支
 git branch -m old-name new-name
