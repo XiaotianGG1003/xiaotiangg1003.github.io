@@ -397,12 +397,380 @@ struct stat {
 
 ### mmap(内存映射)
 * mmap(memory map)本质上是建立物理地址与虚拟地址的映射关系
-将不同进程的虚拟内存映射到相同的物理内存，相比文件流和文件描述符，只建立映射，不用讲内核中数据拷贝到用户态
+将不同进程的虚拟内存映射到相同的物理内存，相比文件流和文件描述符，mmap只建立映射，不用将内核中数据拷贝到用户态
 ![mmap1](../assets/notes/linux/QQ20251106-212506.jpg)
 * Linux内核中大部分也是使用虚拟内存，内核和进程的虚拟内存都可以映射到同一物理内存
 ![mmap2](../assets/notes/linux/QQ20251106-212605.jpg)
 **实际应用场景**
 * 共享内存：内核分配一块物理内存，同时映射到多个进程的用户虚拟地址空间，且内核自身也会映射该物理内存（用于管理），实现「进程间共享数据」或「内核与进程共享数据」
 * 设备驱动的内存映射：硬件设备的 I/O 内存通常会被内核映射到内核虚拟地址（内核操作硬件），同时驱动可通过 mmap() 接口，将**同一块设备物理内存**映射到用户态的虚拟地址，让应用程序直接操作硬件（无需系统调用中转，效率极高）
+```cpp
+// addr 映射其实地址,图中start addr
+// pro_t保护位 PROT_EXEC PROT_READ PROT_WRITE PROT_NONE
+// flags对内存映射区域的修改是否对映射了同一区域的其他进程可见
+// MAP_SHARED 进程共享修改，修改同步底层文件，持久化
+// MAP_PRIVATE 修改仅当前进程可见，copy-on-write写时复制，仅在进程写的时候复制
+// 进程私有，修改后内容在进程退出后丢失，原文件内容不改变
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+int munmap(void *addr, size_t length);
+```
+```cpp
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <iostream>
+#include <sys/stat.h>
+#include <cstring>
+using namespace std;
+#define MMAP_SIZE 4096
 
-  
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        cerr << "Usage: " << argv[0] << " <src> <dest>" << endl;
+        return 1;
+    }
+    int srcFd = open(argv[1], O_RDONLY);
+    if (srcFd < 0) {
+        cerr << "Failed to open source file: " << argv[1] << endl;
+        return 1;
+    }
+    int destFd = open(argv[2], O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (destFd < 0) {
+        cerr << "Failed to open destination file: " << argv[2] << endl;
+        return 1;
+    }
+
+    // 获取源文件大小
+    struct stat srcStat;
+    fstat(srcFd, &srcStat);
+    off_t srcSize = srcStat.st_size;
+    truncate(argv[2], srcSize);
+
+    off_t offset = 0;
+    while (offset < srcSize) {
+        off_t length = 0;
+        if (srcSize - offset < MMAP_SIZE) {
+            length = srcSize - offset;
+        } else {
+            length = MMAP_SIZE;
+        }
+        void* srcAddr = mmap(nullptr, MMAP_SIZE, PROT_READ, MAP_SHARED, srcFd, offset);
+        if (srcAddr == MAP_FAILED) {
+            cerr << "mmap failed for source file" << endl;
+            break;
+        }
+        void* destAddr = mmap(nullptr, MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, destFd, offset);
+        if (destAddr == MAP_FAILED) {
+            cerr << "mmap failed for destination file" << endl;
+            break;
+        }
+        // 复制数据
+        memcpy(destAddr, srcAddr, length);
+        offset += MMAP_SIZE;
+
+        // 解除映射
+        int mun1 = munmap(srcAddr, length);
+        if (mun1 != 0) {
+            cerr << "munmap failed for source file" << endl;
+        }
+        int mun2 = munmap(destAddr, length);
+        if (mun2 != 0) {
+            cerr << "munmap failed for destination file" << endl;   
+        }
+    }
+    return 0;
+}
+```
+
+## 进程
+* 在操作系统中，进程是分配资源的最小单位，每个进程占用的资源包括上下文、工作目录、寄存器值、打开文件表(fd表)等
+* 进程之间是隔离的，进程通过系统调用执行上下文切换，每个进程无法感知其他进程的存在
+
+### 相关命令
+```bash
+ps             # 显示与该终端关联的进程
+ps x           # 显示与用户关联的进程
+ps aux         # 与所有用户相关的进程
+top            # 每秒统计进程信息，类似Windows任务管理器
+pstree         # 打印进程树
+kill -l        # 显示所有信号
+kill -9 pid    # 以异常方式终止前台和后台进程
+ctrl + c/z     # 当进程在前台运行时，终止/暂停信号
+```
+* 进程状态码
+![ps_status](../assets/notes/linux/QQ20251107-150636.jpg)
+
+### 进程标识
+* **PID(process identification)** 系统会为每个进程分配一个PID
+* PID 前1024为长期运行系统进程保留，从1025-MAX循环分配
+* 通过系统调用`pid_t getpid()`获取当前进程PID,`pid_t getppid()`获取父进程PID，如果父进程终止，会被`PID=1`进程接管。
+
+### 进程创建
+* `pid_t fork()`创建进程，创建成功在父进程中返回子进程的pid、子进程中返回0。创建失败返回-1
+* 父子进程都是从fork后开始返回，子进程不会执行前面的代码
+* 文件描述符表是进程私有的，共享打开文件(表项)
+
+**fork原理：**
+1. 复制父进程的进程控制块PCB(task_struct)，修改PID,PPID、运行状态等字段
+2. 复制父进程的虚拟地址空间(代码段，数据段，堆、栈)和页表，设为只读、写时复制
+3. 复制父进程的文件描述符表，指向同一个打开文件表项(引用+1)
+
+```cpp
+int a = 10;  // 数据段
+
+int main() {
+
+    cout << "Before Forking Process!\n";
+    int b = 20; // 栈
+    int* c = new int(30); // 堆
+    pid_t pid = fork();
+    if (pid < 0) {
+        cerr << "Fork failed!" << endl;
+        return 1;
+    } else if (pid == 0) {
+        // Child process
+        a += 100, b += 100, *c += 100;
+        printf("a: %d, b: %d, c: %d\n", a, b, *c);
+        cout << "Hello from Child Process! PID: " << getpid()  << ", ParentPID: " << getppid() << endl;
+    } else {
+        // Parent process
+        sleep(3);
+        printf("a: %d, b: %d, c: %d\n", a, b, *c);
+        cout << "Hello from Parent Process! PID: " << getpid() << ", Child PID: " << pid << endl;
+    }
+    return 0;
+}
+```
+* 输出结果
+```bash
+Before Forking Process!
+a: 110, b: 120, c: 130
+Hello from Child Process! PID: 24935, ParentPID: 24934
+a: 10, b: 20, c: 30
+Hello from Parent Process! PID: 24934, Child PID: 24935
+```
+* 如果去掉`cout << "Before Forking Process!\n";`中的换行符，结果如下
+```cpp
+Before Forking Process!a: 110, b: 120, c: 130
+Hello from Child Process! PID: 29893, ParentPID: 29892
+Before Forking Process!a: 10, b: 20, c: 30
+Hello from Parent Process! PID: 29892, Child PID: 29893
+```
+* 原因是stdin、stdout为行缓冲，没有读到换行符会一直留在用户态缓冲区(属于虚拟内存空间，实行COW)，会导致子进程也会复制一份。
+* 使用`fflush(stdout)`手动刷新到内核缓存区
+
+### 进程终止
+* 正常终止(retutn -> exit(库函数) -> _exit(系统调用))
+* 异常终止(abort -> SIGABRT)，内核给进程发信号`kill -6 pid`
+
+exit执行过程
+1. 执行atexit注册函数
+2. 刷新用户态缓冲区
+3. 调用_exit(status)终止进程
+```cpp
+void cleanup_function() {
+    cout << "Executing cleanup function before exit.";
+}
+
+int main() {
+    atexit(cleanup_function);
+    cout << "Program is running. PID: " << getpid();
+    // Program is running. PID: 38584Executing cleanup function before exit.
+     exit(999);
+    // 没有刷新用户态缓存，没有执行cleanup_function，无输出
+    _exit(999); 
+    return 0;
+}
+```
+
+### wait/waitpid
+* 父进程通过`fork`创建子进程，子进程推出后，会保留PCB，包含退出信息，资源使用情况等。由父进程调用`wait()`或`waitpid()`回收资源，否则会变成僵尸进程
+* 孤儿进程：子进程存活，父进程终止，子进程会被`1`号进程收养，由`1`号进程回收资源
+* 僵尸进程：子进程终止后，父进程未调用`wait/waitpid`回收资源，导致PCB残留在进程，占用系统资源
+```cpp
+// 返回终止子进程的pid 状态信息由wstatus传出
+pid_t wait(int *wstatus);
+// pid > 0 等待指定子进程 pid = -1 等待任意子进程 
+// options为WNOHANG时不阻塞，立刻返回，如何没有子进程状态改变，返回0
+pid_t waitpid(pid_t pid, int *wstatus, int options);
+```
+```cpp
+void print_status(int status) {
+    if (WIFEXITED(status)) { // 子进程是否正常终止
+        cout << "Child exited with code: " << WEXITSTATUS(status) << endl;
+    } else if (WIFSIGNALED(status)) { // 子进程是否异常终止
+        cout << "Child terminated by signal: " << WTERMSIG(status) << endl;
+    } else {
+        cout << "Child stopped or continued" << endl;
+    }
+}
+
+int main() {
+    pid_t pid = fork();
+    if (pid < 0) {
+        cerr << "Fork failed!" << endl;
+        return 1;
+    } else if (pid == 0) {
+        // Child process
+        cout << "Hello from Child Process! PID: " << getpid() << endl;
+        exit(122);
+        // sleep(5);
+    } else {
+        // Parent process
+        sleep(10);
+        int status;
+        pid_t waitedPid = wait(&status);
+        cout << "Hello from Parent Process! " << waitedPid << " terminated" << endl;
+        print_status(status);
+    }
+    return 0;
+}
+```
+```bash
+# 正常终止
+Hello from Child Process! PID: 81864
+Hello from Parent Process! 81864 terminated
+Child exited with code: 122
+```
+
+### exec
+* 替换当前进程的代码段、数据段和堆栈，执行一个新程序，程序完全替换为新程序，但进程的PID不变
+```cpp
+// pathname 可执行文件的路径或相对路径
+// file 文件名，会自动搜索 PATH 环境变量指定的目录
+// environment 会替换环境变量
+extern char **environ;
+int execl(const char *pathname, const char *arg, .../*, (char *) NULL */);
+int execlp(const char *file, const char *arg, .../*, (char *) NULL */);
+int execle(const char *pathname, const char *arg, .../*, (char *) NULL, char *const envp[] */);
+int execv(const char *pathname, char *const argv[]);
+int execvp(const char *file, char *const argv[]);
+int execvpe(const char *file, char *const argv[], char *const envp[]);
+
+char* env[] = { (char*)"PATH=/home/xiaotiangg/c++/build", nullptr };
+char* argv[] = { (char*)"./test", (char*)"arg1", (char*)"arg2", nullptr };
+
+int main() {
+    // execl("/bin/ls", "ls", "-l", "/home", nullptr);
+    // execlp("build/test", "./test", "arg1", "arg2", nullptr);
+    // execle("build/test", "./test", "arg1", "arg2", nullptr, env);
+    execvpe("build/test", argv, env);
+    return 0;    
+}
+```
+
+### 会话
+* 会话是终端与进程之间的桥梁，关联一个终端，管理多个进程组,前台(终端)/后台(&命令)
+* 终端接受用户输入，如关闭终端、输入信号会传递给会话所有进程
+* 会话首进程(如shell，`setsid()`的调用进程)，SID=PID
+**示例**
+1. 终端启动后，首先创建bash进程，就是「会话首进程」（SID = bash 的 PID）
+2. bash 中执行 ls -l、cat命令，都属于同一个进程组（前台进程组）
+3. 若执行 sleep 100 &（后台运行），sleep 会被放入后台进程组，仍属于当前会话（SID 为终端会话 ID），但不接收终端输入
+4. 关闭终端窗口时，系统会向会话内所有进程发送 SIGHUP 信号，导致所有进程终止（这也是普通后台进程 & 关闭终端后会退出的原因）
+
+### 守护进程(daemon)
+* 守护进程是一种脱离终端关联的独立会话（SID 为自身 PID）、独立进程组
+1. fork + 父进程退出
+2. 设置`setsid()`让子进程成为会话首进程，脱离终端
+3. 修改工作目录到`/`，避免守护进程占用某个挂载目录
+4. 设置文件权限掩码`umask(0)`，清除默认权限掩码，让守护进程创建的文件/目录拥有完整权限
+5. 关闭标准输入 / 输出 / 错误
+:::tip
+现在Linux发行版本中不再手写`daemon`，让`Systemd(aemon)`管理运行、重启、日志等。
+:::
+
+
+## 进程间通信(IPC)
+* **进程间通讯**(Inter-Process Communication)打破进程隔离，实现数据交换、状态同步、资源共享
+* **传统IPC**(管道、信号)、**System V IPC**(消息队列、共享内存、信号量)、**Socket** 
+* IPC核心作用是**打破进程隔离，实现数据交换、状态同步、资源共享。**
+
+### 管道
+* 半双工通讯，同一时间只能单向传输数据
+* 面向字节流，数据之间无边际，需要定义分隔符，如`\n`
+* 读端无数据时阻塞，写端缓存满时阻塞，关闭读端后写端收到`SIGPIPE`信号
+#### 匿名管道
+* 一般用于父子、兄弟进程专用，通过`int pipe(int pipefd[2])`,`pipefd`传入参数返回两个文件描述符，`fd[0]`表示读端，`fd[1]`表示写端。父子、兄弟间通讯通过`fork()`继承后分别关闭读端和写端进行通讯
+* 仅存在内核中，无名字，不占用文件系统资源，用完后释放
+```cpp
+int main() {
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        cerr << "Pipe creation failed" << endl;
+        return 1;
+    }
+    pid_t cpid = fork();
+    if (cpid == -1) {
+        cerr << "Fork failed" << endl;
+        return 1;
+    }
+    if (cpid == 0) {
+        close(pipefd[0]);
+        write(pipefd[1], "Hello from child", 16);
+        cout << "Child sent message" << endl;
+        return 0;
+    } else if (cpid > 0) {
+        close(pipefd[1]);
+        wait(NULL); // Wait for child to finish
+        char buffer[100];
+        ssize_t n = read(pipefd[0], buffer, sizeof(buffer));
+        cout << "Parent received: " << string(buffer, n) << endl;
+        return 0;
+    }
+    return 0;
+}
+```
+
+#### 命名管道(FIFO)
+* 通过`mkfifo()`函数或者`mkfifo`命令创建命名管道，创建一个类型为`p`的系统文件
+* 任意进程都可以打开文件进行读写进行通讯，使用完后需要手动删除文件或者使用`unlink()`函数
+```cpp
+int main()
+{
+    pid_t pid = fork();
+    if (pid < 0) {
+        cerr << "Fork failed" << endl;
+        return 1;
+    } else if (pid == 0) {
+        int fd = open("named_pipe", O_WRONLY);
+
+        sleep(5);
+        cout << "Child process writing to pipe..." << endl;
+        write(fd, "Hello from child process", 24);
+        close(fd);
+    } else {
+        int fd = open("named_pipe", O_RDONLY);
+        char buffer[100];
+        ssize_t n = read(fd, buffer, sizeof(buffer));
+        cout << "Parent received: " << string(buffer, n) << endl;
+        close(fd);
+    }
+    unlink("named_pipe"); // 删除管道文件
+    return 0;
+}
+```
+```cpp
+pid_t pid = fork();
+if (pid == 0) {
+    int fd = open("named_pipe", O_WRONLY);
+    write(fd, "Hello from child process", 24);
+    close(fd);
+} else {
+    int fd = open("named_pipe", O_RDONLY);
+    wait(NULL); // 阻塞 等待子进程写,应该删除
+    read(fd, buffer, sizeof(buffer)); // 如果没有内容读会阻塞，直到子进程写入内容
+}
+```
+:::tip
+管道是无缓冲、单向流的。
+当所有写端关闭后，读端的`read()`就会立刻返回`0（EOF）`，即使子进程曾经写过内容，只要读之前没人读，数据就会被内核缓冲区清空（EOF信号触发）。
+:::
+
+### 信号
+
+### 消息队列
+
+### 共享内存 + 信号量
+
+### 套接字(socket)
