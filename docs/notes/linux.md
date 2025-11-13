@@ -4,7 +4,7 @@ title: Linux系统编程
 
 # Linux 系统编程
 
-## vim编辑器
+## vim 编辑器
 ### 视图切换
 ![vim](../assets/notes/linux/QQ20251031-154553.jpg)
 
@@ -768,9 +768,234 @@ if (pid == 0) {
 :::
 
 ### 信号
+* 信号是Linux的一种事件通知机制，内核感知事件源，当事件源发生某个事件时，内核会发送信号给进程，进程可以自定义处理函数
+  1. 事件源包括硬件(`SIGSEGV`段错误、`SEGFPE`浮点错误)、内核(`SEGPIPE`读端关闭，写管道)、应用程序(`SEGABRT`进程终止)、用户(`ctrl + c \ z SEGINT SEGQUIT SEGTSTOP`)
+  2. `kill(pid_t pid, int sig)`向指定进程发送信号、`raise(int sig)`给自身进程发信号，也可以通过`kill -[signum] pid`命令发送信号
+  3. 进程自定义处理函数
+  ```cpp
+  typedef void (*sighandler_t)(int);
+  // signum 要捕获的信号  SIG_IGN忽略 SIG_DFL执行默认处理
+  // 默认行为 Term终止 Ign忽略 Core终止并生成核心文件 Stop暂停 Cont恢复
+  sighandler_t signal(int signum, sighandler_t handler);
+  The signals SIGKILL and SIGSTOP cannot be caught or ignored.
+  ```
+* 信号是异步的：信号可以在任意时刻发送，进程什么时候收到信号是不确定的，进程收到信号后立刻处理信号
+* 信号是不稳定的：事件产生信号到内核递送信号(往往在进程调度前)之间信号可能丢失。发送相同信号多次，仅处理一次也会丢失信号。
+![signal](../assets/notes/linux/QQ20251113-101836.jpg)
+* 不同系统关于信号的语义不一样
+![signals_linux](../assets/notes/linux/QQ20251113-102136.jpg)
+```cpp
+void handle(int signum) {
+    switch(signum) {
+        case SIGINT:
+            cout << "Caught SIGINT (Ctrl+C)." << endl;  
+            break;
+        case SIGTSTP:
+            cout << "Caught SIGTSTP (Ctrl+Z)." << endl;
+            break;
+        case SIGKILL:
+            cout << "Caught SIGKILL." << endl;
+            break;
+        default:
+            cout << "Caught signal " << signum << endl;
+    }
+}
 
-### 消息队列
+int main()
+{
+    if (signal(SIGINT, handle) == SIG_ERR) {
+        cerr << "Error setting signal handler for SIGINT" << endl;
+        return 1;
+    }
+    if (signal(SIGTSTP, handle) == SIG_ERR) {
+        cerr << "Error setting signal handler for SIGTSTP" << endl;
+        return 1;
+    }
+    if (signal(SIGQUIT, handle) == SIG_ERR) {
+        cerr << "Error setting signal handler for SIGQUIT" << endl;
+        return 1;
+    }
+    // Note: SIGKILL cannot be caught or ignored, so this is just for demonstration
+    if (signal(SIGKILL, handle) == SIG_ERR) {
+        cerr << "Error setting signal handler for SIGKILL" << endl;
+    }
+    cout << "Process ID: " << getpid() << endl;
+    while (true) {
+        // Keep the program running to catch signals
+    }
+    return 0;
+}
+```
+![signal](../assets/notes/linux/QQ20251113-104830.jpg)
+* `SIGINT、SIGTSTP、SIGQUIT`都被捕获，`SIGKILL`无法被捕获，是为了确保进程一定可以被终止
 
 ### 共享内存 + 信号量
+* 共享内存是指内核将同一块物理内存映射到不同进程各自的虚拟地址空间，实现进程间共享数据，无需将内核将数据拷贝到用户态。
+* 内核不保证进程访问的互斥性，需要配合信号量和互斥锁实现同步，避免**竞态条件**
+* System V IPC 相关命令
+```bash
+ipcs            # 查看IPC相关信息 -l 查看各个IPC的限制
+ipcrm -m shmid  # 删除指定共享内存段
+ipcrm -s semid  # 删除指定信号量集合
+ipcrm -q msgid  # 删除指定信号量集合
+```
+```cpp
+// 根据文件和项目id生成一个键
+key_t ftok(const char *pathname, int proj_id);
+// 创建或返回已有的共享内存段，key取IPC_PRIVATE时进程私有，shmflg为权限和选项
+int shmget(key_t key, size_t size, int shmflg);
+// 共享内存段映射到进程虚拟地址空间，addr为null自动选择合适空间，
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+int shmdt(const void *shmaddr); // 解除链接
+// op: PC_STAT 来获取共享段信息的数据结构(buf返回) IPC_RMID 删除共享段
+int shmctl(int shmid, int op, struct shmid_ds *buf);
+
+
+#define SHM_KEY 0x1234  // 定义共享内存键值
+#define SHM_SIZE 1024  // 定义共享内存大小
+int main(int argc, char* argv[])
+{
+    int shmid = shmget(SHM_KEY, SHM_SIZE, IPC_CREAT | 0666);
+    if (shmid < 0) {
+        cerr << "shmget failed" << endl;
+        return 1;
+    }
+    
+    char* shm_addr = (char *)shmat(shmid, nullptr, 0);
+    if (argc == 2) {
+        strcpy(shm_addr + strlen(shm_addr), argv[1]);
+        cout << "Written to shared memory: " << argv[1] << endl;
+        shmid_ds buf;
+        shmctl(shmid, IPC_STAT, &buf);
+        printf("cuid = %d, perm = %o, size = %lu nattch = %lu\n",
+            buf.shm_perm.cuid, buf.shm_perm.mode, buf.shm_segsz, buf.shm_nattch);
+        shmdt(shm_addr);
+        return 0;
+    } else {
+        cout << "Read from shared memory: " << shm_addr << endl;
+        shmctl(shmid, IPC_RMID, nullptr);
+    }
+    return 0;
+}
+```
+```cpp
+// nsems 信号量个数 shmflg为权限和选项
+int semget(key_t key, int nsems, int semflg);
+// semnum 信号量在信号集合中的索引 op: SETVAL获取 GETVAL查询 IPC_RMID删除
+int semctl(int semid, int semnum, int op, ...);
+int semop(int semid, struct sembuf *sops, size_t nsops);
+// sem_num表示信号量值在集合的索引 sem_op信号量数值的变化，sem_flg其他控制信息
+struct sembuf{
+    unsigned short sem_num;  /* semaphore number */
+    short          sem_op;   /* semaphore operation */
+    short          sem_flg;  /* operation flags */
+}
+
+
+const int N = 100000;
+void sem_p(int semid) {
+    struct sembuf p = {0, -1, SEM_UNDO};
+    semop(semid, &p, 1);
+}
+void sem_v(int semid) {
+    struct sembuf v = {0, 1, SEM_UNDO};
+    semop(semid, &v, 1);
+}
+int main()
+{
+    int key_t = ftok("/semaphore.cpp", 'S');
+    // Create semaphore
+    int semid = semget(key_t, 1, IPC_CREAT | 0666);
+    if (semid < 0) {
+        cerr << "semget failed" << endl;
+        return 1;
+    }
+    // Initialize semaphore to 1
+    semctl(semid, 0, SETVAL, 1);
+
+    int shmid = shmget(SHM_KEY, SHM_SIZE, IPC_CREAT | 0666);
+    if (shmid < 0) {
+        cerr << "shmget failed" << endl;
+        return 1;
+    }
+    int* shm_addr = (int *)shmat(shmid, nullptr, 0);
+    shm_addr[0] = 0;
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        cerr << "Fork failed" << endl;
+        return 1;
+    } else if (pid == 0) {
+        for (int i = 0; i < N; i++) {
+            sem_p(semid);
+            shm_addr[0]++;
+            sem_v(semid);
+        }
+        exit(0);
+    } else {
+        for (int i = 0; i < N; i++) {
+            sem_p(semid);
+            shm_addr[0]++;
+            sem_v(semid);
+        }
+        wait(nullptr);
+        cout << "Final value: " << shm_addr[0] << endl;
+    } 
+    shmdt(shm_addr);
+    shmctl(shmid, IPC_RMID, nullptr);
+    semctl(semid, 0, IPC_RMID);
+    return 0;
+}
+```
+
+### 消息队列
+* 消息队列适用于带类型的消息传输，由内核维护的链表结构
+* 数据有边界，每个消息是独立的单元
+* 进程发送消息后存在内核中，进程退出后消息不丢失
+* 数据需要拷贝到内核，速度比共享内存慢
+```cpp
+int msgget(key_t key, int msgflg);
+//  msgp参数总是指向消息数据 第一个成员必须是长整型表示类型 msgsz表示消息数组大小
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
+int msgctl(int msqid, int op, struct msqid_ds *buf);
+
+
+struct mymsg {
+    long mtype;
+    char mtext[100];
+};
+
+int main() 
+{
+    int key = ftok("msg_queue.cpp", 'A');
+    int msgid = msgget(key, IPC_CREAT | 0666);
+    if (msgid < 0) {
+        cerr << "msgget failed" << endl;
+        return 1;
+    }
+    pid_t pid = fork();
+    mymsg msg;
+    if (pid < 0) {
+        cerr << "Fork failed" << endl;
+        return 1;
+    } else if (pid == 0) {
+        msg.mtype = 1;
+        strcpy(msg.mtext, "Hello, this is a message queue example.");
+        msgsnd(msgid, &msg, sizeof(msg.mtext), 0);
+        cout << "Message sent from child process." << endl;
+        exit(0);
+    } else {
+        msgrcv(msgid, &msg, sizeof(msg.mtext), 1, 0);
+        cout << "Message received in parent process: " << msg.mtext << endl;
+    }
+    msgctl(msgid, IPC_RMID, nullptr);
+    return 0;
+}
+```
 
 ### 套接字(socket)
+
+
+## 线程
+
