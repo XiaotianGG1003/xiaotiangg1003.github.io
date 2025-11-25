@@ -66,7 +66,7 @@ export default defineConfig({
 function nav(): DefaultTheme.NavItem[] {
   return [
       { text: "💭 Blogs", link: "/blogs/docker" },
-      { text: "📝 Notes", link: "/notes/linux" },
+      { text: "📝 Notes", link: "/notes/linux_system" },
       { text: "👋 About", link: "/about.md" }
   ]
 }
@@ -93,7 +93,8 @@ function sidebar(): DefaultTheme.SidebarItem[] {
         text: '学习笔记',
         collapsed: false,
         items: [
-          { text: 'Linux系统编程', link: '/notes/linux'},
+          { text: 'Linux系统编程', link: '/notes/linux_system'},
+          { text: 'Linux网络编程', link: '/notes/linux_network' },
           { text: '算法基础', link: '/notes/basic-algorithm' },
           { text: 'C++基础入门', link: '/notes/basic-cpp' },
           { text: 'Git常用指令', link: '/notes/git' },
