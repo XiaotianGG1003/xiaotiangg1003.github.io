@@ -1021,4 +1021,311 @@ int main()
 
 
 ## 线程
+* 进程是分配资源的最小单位，而线程是CPU调度的最小单位
+* 线程就是一个执行流程
+### 为什么要引入线程?
+1. 进程之间的切换开销大，需要进行上下文的保存和切换，同时CPU中的高速缓存和TLB表会失效。
+2. 进程之间通讯需要打破隔离，而线程共享同一块虚拟空间，通讯代价小
+3. 进程的创建和销毁代价大，而线程的创建和销毁是轻量级的
 
+![pthread](../assets/notes/linux/QQ20251124-203949.jpg)
+:::tip
+同一个进程中多个线程共享进程资源，但每个线程拥有自己的栈，一个线程可以访问其他线程的栈
+:::
+
+
+### 线程的创建和终止
+```cpp
+// 获取线程标识符
+pthread_t pthread_self(void);
+// 创建线程 start_routine入口函数，arg入口函数参数
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg);
+// 线程退出，等价于return (void *)retval
+void pthread_exit(void *retval);
+// 等待线程结束并获取返回值
+int pthread_join(pthread_t thread, void **retval);
+```
+:::tip
+之前的系统调用和库函数在出错的时候会设置全局`errno`，通过`perror`输出错误信息
+线程库中的函数执行失败不会设置`errno`,防止并发造成错误，而是通过返回值返回
+:::
+```cpp
+void* start_routine(void* args) {
+    char* str = (char *)args;
+    cout << "Argument: " << str << endl;
+    printf("Thread: PID: %d, PPID: %d, TID: %lu\n", getpid(), getppid(), pthread_self());
+    
+    int ret = 100;
+    // pthread_exit((void *)ret);
+    return (void *)ret;
+}
+
+int main () {
+    pthread_t tid;
+    char* arg = "Hello, Thread!";
+    if (pthread_create(&tid, nullptr, start_routine, arg) != 0) {
+        cerr << "Failed to create thread" << endl;
+        return -1;
+    }
+    printf("Main: Created thread with TID: %lu\n", tid);
+    printf("Main: PID: %d, PPID: %d, TID: %lu\n", getpid(), getppid(), pthread_self());
+
+    // pthread_detach(tid); // 分离线程, 主线程无法获取子线程的返回值
+    int result;
+    // 等待线程结束并获取返回值
+    if (pthread_join(tid, (void**)&result) != 0) {
+        cerr << "Failed to join thread" << endl;
+        sleep(3);
+        return -1;
+    }
+    printf("Main: Thread returned %d\n", result);
+
+    sleep(3); 
+    return 0;
+}
+```
+
+### 线程的取消和资源清理
+
+
+```cpp
+// 线程会将取消标志位设置为真，当这个线程执行一些函数时(称为取消点)，线程就会退出。
+// 部分取消点 pthread_testcancel() sleep()
+int pthread_cancel(pthread_t thread);
+// 线程推出前会执行线程清理函数
+void pthread_cleanup_push(void (*routine)(void *), void *arg);
+// 0表示退出不执行 非0表示退出执行
+void pthread_cleanup_pop(int execute);
+```
+```cpp
+#include<iostream>
+#include<unistd.h>
+#include<pthread.h>
+#include<string.h>
+using namespace std;
+
+void cleanup(void* arg) {
+    char *str = (char *)arg;
+    printf("%s\n", str);
+}
+
+void* start_routine(void* args) {
+    pthread_cleanup_push(cleanup, (void*)"first");
+    pthread_cleanup_push(cleanup, (void*)"second");
+    pthread_cleanup_push(cleanup, (void*)"third");
+    
+    pthread_cleanup_pop(0); 
+    // sleep(1);
+    // return nullptr;
+    // pthread_exit(NULL); // 线程退出，执行清理函数
+    for (;;) {
+        pthread_testcancel(); // 设置取消点
+    }
+
+    pthread_cleanup_pop(1); // 非0 执行清理函数
+    pthread_cleanup_pop(0); // 不执行清理函数
+    
+    return nullptr;
+    // pthread_cleanup_pop(0);     
+}
+
+int main() {
+    pthread_t tid;
+    int err;
+    err = pthread_create(&tid, nullptr, start_routine, nullptr);
+    if (err != 0) {
+        cerr << "Failed to create thread: " << strerror(err) << endl;
+        return -1;
+    }
+
+    err = pthread_cancel(tid); // 取消线程
+ 
+    err = pthread_join(tid, nullptr); // 等待线程结束
+    if (err != 0) {
+        cerr << "Failed to join thread: " << strerror(err) << endl;
+        return -1;
+    }
+    return 0;
+}
+```
+* `pthread_cleanup_push`和`pthread_cleanup_pop`必须成对出现
+```cpp
+#define pthread_cleanup_push(routine, arg) \
+ do {                                        \
+ __pthread_cleanup_class __clframe (routine, arg)
+ /* Remove a cleanup handler installed by the matching pthread_cleanup_push.
+ If EXECUTE is non-zero, the handler function is called. */
+ #define pthread_cleanup_pop(execute) \
+ __clframe.__setdoit (execute);       \
+ } while (0)
+```
+
+### 线程的同步和互斥
+* 异步：任何调度都有可能出现(两个执行流程不相关)
+* 同步：让特定的调度无法出现(让特定执行流程先执行，后执行)
+* 互斥：某个共享资源一段时间内只能让一个线程访问
+* 可重入性：多线程下如果函数在执行的过程中重新调用同一个函数，如果重复的函数会导致错乱，则函数是不可重入的。
+* 乐观锁思想：假设多线程操作共享资源时 “冲突概率极低”，因此不提前加锁阻塞，而是在 “数据提交时” 验证是否有其他线程修改过该资源。若未被修改则提交成功；若已被修改则放弃操作或重试。适用于读多写少、低冲突场景，否则会频繁重试。需要处理“ABA”问题
+
+```cpp
+// 需要使用互斥锁来保证线程的同步和互斥访问资源
+pthread_mutex_t fastmutex = PTHREAD_MUTEX_INITIALIZER;
+int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr);
+int pthread_mutex_destroy(pthread_mutex_t *mutex);
+int pthread_mutex_lock(pthread_mutex_t *mutex);
+int pthread_mutex_unlock(pthread_mutex_t *mutex);
+int pthread_mutex_trylock(pthread_mutex_t *mutex);
+
+// 通过条件变量实现高效等待，避免忙等
+// 当条件不成立时阻塞，等待唤醒
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;//静态初始化
+int pthread_cond_init(pthread_cond_t *cond, pthread_condattr_t *cond_attr);//动态初始化
+int pthread_cond_signal(pthread_cond_t *cond); //唤醒一个线程
+int pthread_cond_broadcast(pthread_cond_t *cond);//唤醒所有线程
+int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);//等待
+int pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime);//具有超时时限的等待
+int pthread_cond_destroy(pthread_cond_t *cond);//条件变量销毁
+```
+:::tip
+睡眠锁：不满足条件会陷入睡眠(阻塞)状态 \
+自旋锁：不满足条件会死循环直到条件成立，一般用于条件很快就会满足的情况 \
+mutex互斥锁就是一种睡眠锁
+:::
+
+
+### 阻塞队列实现线程池
+```cpp
+#ifndef BLOCKQ_H
+#define BLOCKQ_H
+
+#include <pthread.h>
+#include <malloc.h>
+typedef int E;
+const int N = 100;
+
+typedef struct {
+    E data[N];
+    int front;
+    int rear;
+    int size;
+
+    pthread_mutex_t mutex;
+    pthread_cond_t not_empty;
+    pthread_cond_t not_full;
+} BlockQ;
+
+BlockQ* blockq_create() {
+    BlockQ* q = (BlockQ*)malloc(sizeof(BlockQ));
+    q->front = 0;
+    q->rear = 0;
+    q->size = 0;
+    pthread_mutex_init(&q->mutex, nullptr);
+    pthread_cond_init(&q->not_empty, nullptr);
+    pthread_cond_init(&q->not_full, nullptr);
+    return q;
+}
+void blockq_destroy(BlockQ* q) {
+    pthread_mutex_destroy(&q->mutex);
+    pthread_cond_destroy(&q->not_empty);
+    pthread_cond_destroy(&q->not_full);
+    free(q);
+}
+void blockq_push(BlockQ* q, E item) {
+    pthread_mutex_lock(&q->mutex);
+    while (q->size == N) {
+        // 释放锁和阻塞作为原子操作,防止释放锁还未阻塞时有其他线程唤醒
+        pthread_cond_wait(&q->not_full, &q->mutex);
+    }
+    q->data[q->rear] = item;
+    q->rear = (q->rear + 1) % N;
+    q->size++;
+    pthread_cond_signal(&q->not_empty);
+    pthread_mutex_unlock(&q->mutex);
+}
+E blockq_pop(BlockQ* q) {
+    pthread_mutex_lock(&q->mutex);
+    while (q->size == 0) {
+        pthread_cond_wait(&q->not_empty, &q->mutex);
+    }
+    E val = q->data[q->front];
+    q->front = (q->front + 1) % N;
+    q->size--;
+    pthread_cond_signal(&q->not_full);
+    pthread_mutex_unlock(&q->mutex);
+    return val;
+}
+bool blockq_is_empty(BlockQ* q) {
+    pthread_mutex_lock(&q->mutex);
+    int size = q->size;
+    pthread_mutex_unlock(&q->mutex);
+    return size == 0;
+}
+bool blockq_is_full(BlockQ* q) {
+    pthread_mutex_lock(&q->mutex);
+    int size = q->size;
+    pthread_mutex_unlock(&q->mutex);
+    return size == N;
+}
+#endif
+```
+```cpp
+#include "include/blockq.h"
+#include "unistd.h"
+using namespace std;
+
+typedef struct {
+    BlockQ* q;
+    pthread_t *threads;
+    int num;
+}Thread_pool;
+
+void* start_routine(void* arg) {
+    Thread_pool* p = (Thread_pool*)arg;
+    BlockQ* q = p->q;
+    while (true) {
+        E task = blockq_pop(q);
+        if (task == -1) {
+            break;
+        }
+        // 执行任务
+        printf("Thread %lu is processing task %d\n", pthread_self(), task);
+        sleep(2);
+        printf("Thread %lu finished task %d\n", pthread_self(), task);
+    }
+    return NULL;
+}
+
+Thread_pool* thread_pool_create(int n) {
+    Thread_pool *p = (Thread_pool *)malloc(sizeof(Thread_pool));
+    p->q = blockq_create();
+    p->threads = (pthread_t *)malloc(sizeof(pthread_t) * n);
+    p->num = n;
+    for (int i = 0; i < n; i++) { 
+        pthread_create(&p->threads[i], NULL, start_routine, p);
+    } 
+    return p;
+}
+
+void thread_pool_destroy(Thread_pool* p) {
+    for (int i = 0; i < p->num; i++) {
+        blockq_push(p->q, -1); // 发送终止信号
+    }
+    for (int i = 0; i < p->num; i++) {
+        pthread_join(p->threads[i], NULL);
+    }
+    free(p->threads);
+    blockq_destroy(p->q);
+    free(p);
+}
+
+int main() {
+    Thread_pool* pool = thread_pool_create(3);
+
+    for (int i = 0; i < 10; i++) {
+        blockq_push(pool->q, i);
+    }
+    thread_pool_destroy(pool);
+    return 0;
+}
+```
+ 
