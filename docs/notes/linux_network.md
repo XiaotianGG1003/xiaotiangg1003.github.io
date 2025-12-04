@@ -111,6 +111,197 @@ A4: 1. 防止最后一个ACK丢失，对端重传FIN报文情况。如直接关�
 
 ## socket编程
 
+### 地址信息
+* 字节序：字节数据在内存中存放的数据，网络协议采用(TCP/IP)大端序，x86/x64、ARM架构通常采用小端序
+* 大端序：高地址存低字节、低地址存高字节，如0x12345678，地址由低到高，存放12 34 56 78
+* 小端序：高地址存高字节、低地址存低字节，如上，地址由低到高，存放78 56 34 12
+```cpp
+struct sockaddr_in {
+    sa_family_t sin_family; /* address family: AF_INET */
+    in_port_t sin_port;   /* port in network byte order */
+    struct in_addr sin_addr;   /* internet address */
+};
+ /* Internet address. */
+struct in_addr {
+    uint32_t       
+};
+
+// 网络字节序与主机字节序转换 
+// h --> host n --> net l --> 32bit s --> 16bit
+uint32_t htonl(uint32_t hostlong);
+uint16_t htons(uint16_t hostshort);
+uint32_t ntohl(uint32_t netlong);
+uint16_t ntohs(uint16_t netshort);
+
+// #include <arpa/inet.h>
+// 将字符串转换为网络地址二进制格式
+int inet_aton(const char *cp, struct in_addr *inp);
+int inet_pton(int af, const char *cp, void *buf);
+// 将二进制网络地址转换为字符串格式
+char *inet_ntoa(struct in_addr in);
+const char *inet_ntop(int af, const void *cp, char buf, socklen_t len);
+
+// 设置服务器地址
+struct sockaddr_in server_addr;
+memset(&server_addr, 0, sizeof(server_addr));
+server_addr.sin_family = AF_INET;
+server_addr.sin_port = htons(8080);  // 服务器端口
+
+// 方式一 inet_pton/inet_addr赋值结果已是网络字节序
+server_addr.sin_addr.s_addr = inet_addr("192.168.1.1");  // 服务器IP地址
+inet_pton(AF_INET, "192.168.1.1", &server_addr.sin_addr); // 服务器IP地址
+// 方式二 直接赋值主机字节序后转换为网络字节序
+server_addr.sin_addr.s_addr = htonl(0xc0a80101); // 在内存中为01 01 A8 C0而hostl会进行字节序转换
+
+// 验证地址和端口
+char ip_buf[INET_ADDRSTRLEN];
+printf("服务器地址：%s:%d\n", 
+    inet_ntop(AF_INET, &server_addr.sin_addr, ip_buf, sizeof(ip_buf)),
+    ntohs(server_addr.sin_port)); // 网络字节序→主机字节序，方便阅读
+```
+
+### 通过域名获取IP地址
+```cpp
+int main(int argc, char *argv[]) {
+    struct hostent *host;
+    host = gethostbyname("www.baidu.com");
+    
+    cout << "host name: " << host->h_name << endl;
+    for (int i = 0; host->h_aliases[i] != nullptr; i++) {
+        cout << "aliase: " << host->h_aliases[i] << endl;
+    }
+    cout << "address type: " << (host->h_addrtype == AF_INET ? "AF_INET" : "AF_INET6") << endl;
+    cout << "address length: " << host->h_length << endl;
+    char buf[128] = {0};
+    for (int i = 0; host->h_addr_list[i] != nullptr; i++) {
+        memset(buf, 0, sizeof(buf));
+        inet_ntop(host->h_addrtype, host->h_addr_list[i], buf, sizeof(buf));
+        cout << "address " << i + 1 << ": " << buf << endl;
+    }
+    return 0;
+}
+```
+
+### 系统调用
+* TCP通信流程图
+![tcp](../assets/notes/linux/QQ20251204-172406.jpg)
+
+```cpp
+// domain AF_INET --> IPv4 AF_INET6 --> IPv6
+// type SOCK_STREAM --> TCP SOCK_DGRAM --> UDP
+// protocol IPPROTO_TCP --> TCP IPPROTO_UDP -->UDP
+// 创建socket设备，返回设备的文件描述符
+int socket(int domain, int type, int protocol);
+// 通过connect由客户端随机选择一个端口与服务器进行通讯，完成TCP三次握手
+int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+// 给套接字绑定IP和端口号
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+// 开始监听客户端连接，操作系统知道是服务端的套接字，关闭发送、接受缓冲区，维护半连接、全连接队列
+// backlog在早期unix系统中为SYN队列长度，现代系统(Linux 2.2+)中，仅指定ACCEPT (全连接队列)的最大长度
+int listen(int sockfd, int backlog);
+// 从已连接队列中取出连接，返回已连接的套接字
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+// 在用户态与内核态之间传输数据，传输时机取决于内核
+// 使用 read 和 write 可以实现同样的效果，相当于 flags 参数为 0。
+// 有可能多个消息会在一次传输中被发送和接收（"粘包"），
+// 也有有可能一个消息需要多个传输才能被完整的发送和接收("半包")。
+ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+// 关闭文件描述符
+int close(int fd);
+```
+
+### socket实践
+* 服务端
+```cpp
+int main() {
+    signal(SIGPIPE, SIG_IGN); // 忽略SIGPIPE信号，防止写入已关闭的socket时程序崩溃
+    int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    int on = 1;
+    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+    struct sockaddr_in serverAddr;
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(8080);
+    // 绑定地址和端口
+    int ret = bind(listenfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    if (ret != 0) {
+        cerr << "Failed to bind socket." << endl;
+        return 1;
+    }
+    // 开始监听客户端连接
+    listen(listenfd, 10);
+    cout << "Server is listening on port 8080..." << endl;
+
+    sockaddr_in clientAddr;
+    socklen_t clientLen = sizeof(clientAddr);
+    char buf[1024] = {0};
+    while (1) {
+        memset(&clientAddr, 0, sizeof(clientAddr));
+        // 从全连接队列中取出一个连接
+        int connfd = accept(listenfd, (struct sockaddr*)&clientAddr, &clientLen);
+        if (connfd < 0) {
+            cerr << "Failed to accept connection." << endl;
+            return 1;
+        }
+        printf("Accepted connection from %s:%d\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+
+        memset(buf, 0, sizeof(buf));
+        recv(connfd, buf, sizeof(buf), 0);
+        printf("Received message: %s\n", buf);
+        // 回显消息
+        send(connfd, buf, strlen(buf), 0);
+        close(connfd);
+    } 
+    close(listenfd);
+    return 0;
+}
+```
+* 客户端
+```cpp
+int main() {
+    signal(SIGPIPE, SIG_IGN); // 忽略SIGPIPE信号，防止写入已关闭的socket时程序崩溃
+    int clientfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    servaddr.sin_port = htons(8080);
+    // 连接服务端
+    int ret = connect(clientfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    if (ret != 0) {
+        cerr << "Failed to connect to server." << endl;
+        return 1;
+    }
+    cout << "Connected to server successfully." << endl;
+    // 发送消息
+    char buf[1024] = "Hello from client";
+    int bytes_sent = send(clientfd, buf, strlen(buf), 0);
+    cout << "Sent " << bytes_sent << " bytes to server." << endl;
+
+    bytes_sent = send(clientfd, buf, strlen(buf), 0);
+    cout << "Sent " << bytes_sent << " bytes to server." << endl;
+
+    bytes_sent = send(clientfd, buf, strlen(buf), 0);
+    cout << "Sent " << bytes_sent << " bytes to server." << endl;
+
+    memset(buf, 0, sizeof(buf));
+    recv(clientfd, buf, sizeof(buf), 0);
+    cout << "Received from server: " << buf << endl;
+    while (1);
+    close(clientfd);
+    return 0;
+}
+```
+1. 向一个已断开的连接中发送消息，第一次内核会返回RST报文，第二次会收到SIGPIPE信号直接终止进程，使用`signal(SIGPIPE, SIG_IGN)`防止已关闭的socket程序时崩溃
+2. 粘包问题，多次发送可能对应一次或多次接收，接收次数是不确定的
+![packet_sticking](../assets/notes/linux/QQ20251204-175858.jpg)
+3. 服务端主动断开连接会进入timewait状态，此时无法再次启动相同服务端，使用`intsetsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen)`设置套接字属性
+![tcp_server](../assets/notes/linux/QQ20251204-180614.jpg)
 
 
-
+### select实现聊天室功能
