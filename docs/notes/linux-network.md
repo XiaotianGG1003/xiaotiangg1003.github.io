@@ -210,8 +210,15 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags);
 // 关闭文件描述符
 int close(int fd);
 ```
+* UDP 通信流程图
+![udp](../assets/notes/linux/QQ20251208-115500.jpg)
+```cpp
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
+```
 
 ### socket实践
+#### TCP
 * 服务端
 ```cpp
 int main() {
@@ -303,5 +310,474 @@ int main() {
 3. 服务端主动断开连接会进入timewait状态，此时无法再次启动相同服务端，使用`intsetsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen)`设置套接字属性
 ![tcp_server](../assets/notes/linux/QQ20251204-180614.jpg)
 
+### UDP
+* 服务端
+```cpp
+int main() {
+    int socketFd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(8080);
+    int ret = bind(socketFd, (sockaddr*)&serverAddr, sizeof(serverAddr));
+
+    // 实现一对多，一个fd接收多个客户端的数据
+    while (1) {
+        // 必须recvfrom后才能获取客户端地址信息
+        char buf[1024] = {0};
+        sockaddr_in clientAddr;
+        socklen_t addrLen = sizeof(clientAddr);
+        recvfrom(socketFd, buf, sizeof(buf), 0, (sockaddr*)&clientAddr, &addrLen);
+        printf("Client IP: %s, Port: %d\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+        printf("Received data : %s\n", buf);
+
+        printf("Echoing back to client first time\n");
+        sendto(socketFd, buf, sizeof(buf), 0, (sockaddr*)&clientAddr, addrLen);
+        printf("Echoing back to client second time\n");
+        sendto(socketFd, buf, sizeof(buf), 0, (sockaddr*)&clientAddr, addrLen);
+    }
+    close(socketFd);
+    return 0;
+}
+```
+* 客户端
+```cpp
+int main() {
+    int socketFd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(8080);
+    sendto(socketFd, "Hello, server!", 14, 0, (sockaddr*)&serverAddr, sizeof(serverAddr));
+
+    char buf[1024] = {0};
+    recvfrom(socketFd, buf, sizeof(buf), 0, nullptr, nullptr);
+    printf("Received from server: %s\n", buf);
+
+    memset(buf, 0, sizeof(buf));
+    recvfrom(socketFd, buf, sizeof(buf), 0, nullptr, nullptr);
+    printf("Received from server: %s\n", buf);
+    close(socketFd);
+    return 0;
+}
+```
+* UDP无法保证数据的可靠到达，需要交由上层来实现，如KCP、QUIC
+* UDP是无连接的，可以实现一对多通信，
+* 必须要服务端先接收数据才能知道客户端地址，面向报文，一次发送对应一次接收
+![udp_server](../assets/notes/linux/QQ20251208-133500.jpg)
+
+### IO模型
+* POSIX定义五种IO模型：**阻塞IO、非阻塞IO、IO多路复用、信号驱动IO、异步IO**
+* **阻塞IO：** 阻塞等待数据就绪
+* **非阻塞IO：** 如果数据未就绪，直接返回
+* **IO多路复用：** 让内核监听多个FD，阻塞等待一个或多个FD就绪
+* **信号驱动IO：** 数据就绪时通过发送信号，注册信号处理函数，调用信号处理函数
+* **异步IO：** 由内核在后台执行IO，通过回调通知用户
+
+#### IO多路复用
+* 服务端通常使用IO多路复用，如select、poll、epoll
+* 本质上是将多个阻塞点变为一个，避免单线程阻塞在单个FD中(如同时等待终端输入和网络数据)
+
+**1. select**
+```cpp
+#include <sys/select.h>   // 核心头文件
+int select(
+    int nfds,               // 监控的最大 FD + 1
+    // 三个传入传出参数，返回后仅保留已就绪的 FD
+    fd_set *readfds,        // 待监控的「可读」FD 集合
+    fd_set *writefds,       // 待监控的「可写」FD 集合
+    fd_set *exceptfds,      // 待监控的「异常」FD 集合
+    // 超时时间（阻塞/非阻塞控制）0:非阻塞、立即返回 NULL:永久阻塞，直到FD就绪
+    struct timeval *timeout 
+);
+FD_ZERO(&set)       // 清空 FD 集合（初始化）
+FD_SET(fd, &set)    // 将 FD 加入集合
+FD_CLR(fd, &set)    // 将 FD 从集合中移除
+FD_ISSET(fd, &set)  // 判断 FD 是否在集合中
+```
+**2. epoll**
+```cpp
+#include <sys/epoll.h>
+// 升级版（推荐）：size 参数被忽略，仅需传大于 0 的值
+int epoll_create1(int flags); 
+// 操作 epoll 实例中的 FD 集合
+int epoll_ctl(
+    int epoll_fd,       // epoll_create 返回的 epoll 实例描述符
+    int op,             // 操作类型：ADD（添加）MOD（修改）DEL（删除）
+    int fd,             // 要监控的目标 FD（如套接字、STDIN）
+    struct epoll_event *event  // 监控的事件类型 + 自定义数据
+);
+struct epoll_event {
+    // EPOLLIN可读 EPOLLOUT可写 EPOLLET边缘触发
+    uint32_t events;  // 要监控的事件（位掩码）
+    epoll_data_t data;// 自定义数据（通常存 fd，方便后续处理）
+};
+// 自定义数据联合体（常用 fd 字段）
+typedef union epoll_data {
+    void *ptr;    // 自定义指针
+    int fd;       // 目标 FD（最常用）
+    uint32_t u32;
+    uint64_t u64;
+} epoll_data_t;
+// 阻塞等待就绪 FD，返回就绪的 FD 列表
+int epoll_wait(
+    int epoll_fd,               // epoll 实例句柄
+    struct epoll_event *events, // 输出参数：存储就绪的 FD 事件
+    int maxevents,              // 最多接收的就绪事件数（需≤ events数组长度）
+    int timeout                 // 超时时间（毫秒）
+);
+```
+* `epoll`采用红黑树存储监控的FD，链表存储已经就绪的FD的集合
+* 相比`select`升级如下
+  1. 采用红黑树存储监听的FD，监控数量无限制，与内存有关
+  2. 只需要初始化一次，无需重复设置监听集合
+  3. 内核态中采用回调机制，将已就绪的FD加入到就绪链表
+  4. 用户态只需遍历就绪链表获取就绪FD
+* 水平触发，当内核缓冲区中还有数据时，epoll会一直通知，直到缓冲区被读完
+* 边缘触发，每次接收数据，epoll只会通知一次，边缘触发时要一次性读完所有数据(使用循环配合非阻塞)，否则，如果没有新数据触发ET，将无法读取到剩下数据
+* 水平触发由内核兜底，保证数据不会漏读。边缘触发将处理交给应用层，内核只负责通知状态变化，大幅减少事件触发次数，性能高
 
 ### select实现聊天室功能
+* 通过select处理多个用户请求
+* 服务端
+```cpp
+#include <iostream>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <cstring>
+#include <unistd.h>
+#include <signal.h>
+using namespace std;
+
+int main()
+{
+    signal(SIGPIPE, SIG_IGN); // Ignore SIGPIPE signals
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    int on = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+    struct sockaddr_in serverAddr;
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    int ret = bind(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    if (ret != 0) {
+        cerr << "Bind failed." << endl; 
+        return 1;
+    }   
+
+    listen(sockfd, 10);
+    cout << "Server listening on port 8080..." << endl;
+    // 需要监听的文件描述符集合
+    fd_set readfds;
+    int maxfd = sockfd;
+    // 记录所有已连接的客户端
+    int connectedClients[FD_SETSIZE] = {0};
+    while (1) {
+        FD_ZERO(&readfds);
+        FD_SET(sockfd, &readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        for (int i = 0; i <= maxfd; ++i) {
+            if (connectedClients[i]) {
+                FD_SET(i, &readfds);
+            }
+        }
+
+        select(maxfd + 1, &readfds, nullptr, nullptr, nullptr);
+        char buf[1024] = {0};
+        // 有新的连接
+        if (FD_ISSET(sockfd, &readfds)) {
+            struct sockaddr_in clientAddr;
+            clientAddr.sin_family = AF_INET;
+            socklen_t clientAddrLen = sizeof(clientAddr);
+            int connfd = accept(sockfd, (struct sockaddr*)&clientAddr, &clientAddrLen);
+            if (connfd < 0) {
+                cerr << "Accept failed." << endl;
+                continue;
+            }
+            printf("Accepted connection from %s:%d, connected FD: %d\n", 
+                inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port), connfd);
+            // 加入现有连接
+            connectedClients[connfd] = 1;
+            maxfd = max(maxfd, connfd);
+        } else if (FD_ISSET(STDIN_FILENO, &readfds)) {
+            int ret = read(STDIN_FILENO, buf, sizeof(buf));
+            if (ret == 0) {
+                cout << "Standard input closed, shutting down server." << endl;
+                break;
+            }
+            // read 会读取换行符，buf中包含换行符
+            cout << "Input from stdin: " << buf;
+            // Broadcast to all connected clients
+            for (int i = 0; i <= maxfd; ++i) {
+                if (connectedClients[i]) {
+                    cout << "Sending to client " << i << ": " << buf;
+                    int ret = send(i, buf, strlen(buf), 0);
+                    cout << "Sent " << ret << " bytes to client " << i << endl;
+                }
+            }
+        } else {
+            // receieve message from client
+            for (int i = 0; i <= maxfd; ++i) {
+                if (connectedClients[i] && FD_ISSET(i, &readfds)) {
+                    memset(buf, 0, sizeof(buf));
+                    int ret = recv(i, buf, sizeof(buf), 0);
+                    if (ret == 0) {
+                        cout << "Client " << i << " disconnected" << endl;
+                        connectedClients[i] = 0;
+                        close(i);
+                        continue;
+                    }
+                    cout << "Received from client " << i << ": " << buf;
+                    // Echo back to all clients
+                    for (int j = 0; j <= maxfd; ++j) {
+                        if (connectedClients[j] && i != j) {
+                            send(j, buf, strlen(buf), 0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    close(sockfd);
+    return 0;
+}
+```
+
+* 客户端
+```cpp
+#include <sys/socket.h>
+#include <iostream>
+#include <cstring>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+using namespace std;
+
+int main()
+{
+    // 创建TCP socket
+    int client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_fd < 0) {
+        cerr << "创建socket失败" << endl;
+        return 1;
+    }
+    // 设置服务器地址
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(8080);  
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    // 连接到服务器
+    int ret = connect(client_fd, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    if (ret != 0) {
+        cerr << "连接服务器失败" << endl;
+        close(client_fd);
+        return 1;
+    }
+    cout << "成功连接到服务器" << endl;
+
+    fd_set readfds;
+    char buf[1024] = {0};    
+    while (1) {
+        FD_ZERO(&readfds);
+        FD_SET(client_fd, &readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+
+        select(client_fd + 1, &readfds, nullptr, nullptr, nullptr);
+        if (FD_ISSET(STDIN_FILENO, &readfds)) {
+            memset(buf, 0, sizeof(buf));
+            int ret = read(STDIN_FILENO, buf, sizeof(buf));
+            if (ret == 0) {
+                cout << "客户都端输入结束，关闭连接" << endl;
+                break;
+            }
+            send(client_fd, buf, strlen(buf), 0);
+            cout << "发送消息: " << buf;
+        } else if (FD_ISSET(client_fd, &readfds)) {
+            memset(buf, 0, sizeof(buf));
+            int ret = recv(client_fd, buf, sizeof(buf), 0);
+            if (ret == 0) {
+                cout << "服务器关闭连接" << endl;
+                break;
+            }
+            cout << "从服务器收到消息: " << buf;
+        }
+    }
+
+    // 关闭socket
+    close(client_fd);
+    cout << "连接已关闭" << endl;
+    return 0;
+}
+```
+* **select存在的问题**
+1. select中底层采用位图，位图大小`FD_SETSIZE`，监听的文件描述符有上限
+2. select每次执行都需要重新设置监听集合
+3. 在内核中，内核需要对所有的fd轮询是否就绪，即使只有少量fd就绪
+4. 在用户态中，只知道就绪fd数量，还需要遍历集合检查就绪的fd
+
+### epoll改进聊天室
+```cpp
+#include <iostream>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <cstring>
+#include <unistd.h>
+#include <signal.h>
+#include <set>
+#include <vector>
+#include <fcntl.h>
+#include <unordered_map>
+using namespace std;
+#define MAX_EVENTS 1024
+
+int main()
+{
+    signal(SIGPIPE, SIG_IGN); // Ignore SIGPIPE signals
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    int on = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+    struct sockaddr_in serverAddr;
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    int ret = bind(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    if (ret != 0) {
+        cerr << "Bind failed." << endl; 
+        return 1;
+    }   
+
+    listen(sockfd, 10);
+    cout << "Server listening on port 8080..." << endl;
+
+    int epollfd = epoll_create1(EPOLL_CLOEXEC);
+    if (epollfd == -1) {
+        cerr << "epoll_create1 failed." << endl;
+        close(sockfd);
+        return 1;
+    }
+
+    epoll_event ev;
+    ev.events = EPOLLIN | EPOLLET; // 边沿触发
+    ev.data.fd = sockfd;
+    epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev);
+    ev.data.fd = STDIN_FILENO;
+    epoll_ctl(epollfd, EPOLL_CTL_ADD, STDIN_FILENO, &ev);
+
+    epoll_event events[MAX_EVENTS];
+    char buf[1024] = {0};
+    unordered_map<int, time_t> connLastActive; // 所有连接的客户端FD集合
+    while (1) {
+        
+        int readyFds = epoll_wait(epollfd, events, MAX_EVENTS, 3000);
+
+        if (readyFds == -1) {
+            cerr << "epoll_wait failed." << endl;
+            break;
+        } else if (readyFds == 0) {
+            // Timeout, no events
+            vector<int> toClose;
+            for (const auto& [clientFd, lastActive] : connLastActive) {
+                if (time(nullptr) - lastActive >= 10) { // 10秒无活动则关闭连接
+                    toClose.push_back(clientFd);
+                }
+            }
+            for (int fd : toClose) {
+                cout << "Closing inactive connection, FD: " << fd << endl;
+                ev.data.fd = fd;
+                epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, &ev);
+                connLastActive.erase(fd);
+                close(fd);
+            }
+            cout << "epoll_wait timeout, no events." << endl;
+            continue;
+        }
+        for (int i = 0; i < readyFds; ++i) {
+            int fd = events[i].data.fd;
+            if (fd == sockfd) {
+                struct sockaddr_in clientAddr;
+                clientAddr.sin_family = AF_INET;
+                socklen_t clientAddrLen = sizeof(clientAddr);
+                int connfd = accept(sockfd, (struct sockaddr*)&clientAddr, &clientAddrLen);
+                if (connfd < 0) {
+                    cerr << "Accept failed." << endl;
+                    continue;
+                }
+                printf("Accepted connection from %s:%d, connected FD: %d\n", 
+                    inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port), connfd);
+
+                ev.data.fd = connfd;
+                epoll_ctl(epollfd, EPOLL_CTL_ADD, connfd, &ev);
+                connLastActive[connfd] = time(nullptr);
+                // int fstatus = fcntl(connfd, F_GETFL, 0);
+                // fcntl(connfd, F_SETFL, fstatus | O_NONBLOCK); // 将文件描述符设置非阻塞
+
+            } else if (fd == STDIN_FILENO) {
+                memset(buf, 0, sizeof(buf));
+                int ret = read(STDIN_FILENO, buf, sizeof(buf));
+                if (ret == 0) {
+                    cout << "Server input ended, shutting down." << endl;
+                    for (const auto& [clientFd, lastActive] : connLastActive) {
+                        close(clientFd);
+                    }
+                    close(sockfd);
+                    close(epollfd);
+                    return 0;
+                }
+                // Broadcast to all connected clients
+                for (const auto& [clientFd, lastActive] : connLastActive) {
+                    send(clientFd, buf, strlen(buf), 0);
+                }
+                cout << "Sent to clients: " << buf;
+            } else if (events[i].events & EPOLLIN) {
+                memset(buf, 0, sizeof(buf));
+                int ret = recv(fd, buf, sizeof(buf), 0);
+                if (ret == 0) {
+                    cout << "Client disconnected, FD: " << fd << endl;
+                    ev.data.fd = fd;
+                    epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, &ev);
+                    connLastActive.erase(fd);
+                    close(fd);
+                    continue;
+                }
+                cout << "Received from client " << fd << ": " << buf << endl;
+                
+                // 模拟循环读取所有数据
+                // memset(buf, 0, sizeof(buf));
+                // ret = recv(fd, buf, sizeof(buf), 0);
+                // ret = recv(fd, buf, sizeof(buf), MSG_DONTWAIT);
+                // cout << "Received from client " << fd << ": " << buf << endl;
+
+                connLastActive[fd] = time(nullptr); // 更新最后活跃时间
+                // Echo back to all connected clients
+                for (const auto& [clientFd, lastActive] : connLastActive) {
+                    if (clientFd != fd) { // 不回显给发送者
+                        send(clientFd, buf, ret, 0);
+                    }
+                }
+            } 
+        }
+        
+    }
+    close(epollfd);
+    close(sockfd);
+    return 0;
+}
+```
+* `epoll`轮询过程中要设置为非阻塞，否则循环读取`read`，当缓冲区读完时会阻塞，导致事件循环中断，无法处理后续FD
+  1. 使用`fcntl`将文件描述符设为非阻塞
+  2. 在`recv`中设置`MSG_DONTWAIT`非阻塞单次IO行为
+
