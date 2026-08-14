@@ -7,6 +7,9 @@ export default defineConfig({
   // 标签上的图标
   head: [["link", { rel: "icon", href: "/icon.svg" }]],
   lang: "zh-CN",
+  markdown: {
+    math: true,
+  },
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     logo: "/icon.svg",
@@ -68,7 +71,7 @@ export default defineConfig({
 function nav(): DefaultTheme.NavItem[] {
   return [
     { text: "💭 Blogs", link: "/blogs/docker" },
-    { text: "📝 Notes", link: "/notes/linux-system" },
+    { text: "📝 Notes", link: "/notes/machine-learning" },
     { text: "👋 About", link: "/about.md" },
   ];
 }
@@ -95,6 +98,7 @@ function sidebar(): DefaultTheme.SidebarItem[] {
       text: "学习笔记",
       collapsed: false,
       items: [
+        { text: "机器学习基础", link: "/notes/machine-learning" },
         { text: "Python基础", link: "/notes/python-basic" },
         { text: "Linux系统编程", link: "/notes/linux-system" },
         { text: "Linux网络编程", link: "/notes/linux-network" },
