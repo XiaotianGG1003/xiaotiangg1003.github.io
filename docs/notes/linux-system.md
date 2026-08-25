@@ -88,14 +88,14 @@ find . -size -500k
 // 压缩(text archieve)
 tar [主选项+辅选项] 包名 文件或目录
 主选项（有且只能选择其中一个）
-c：创建
+c：创建（create）
 r：追加 
-x：释放
+x：解压（extract）
 t：查看
 辅选项：
-f：指定包文件的名称
-V：显示详细信息,显示打包过程方便查看进度
-z：使用gzip算法压缩或解压缩包文件
+f：指定包文件的名称（file）
+v：显示详细信息,显示打包过程方便查看进度（verbose）
+z：使用gzip算法
 -C：指定解压路径
 压缩
 tar czvf test.tar.gz *
