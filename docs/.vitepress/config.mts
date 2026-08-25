@@ -99,6 +99,7 @@ function sidebar(): DefaultTheme.SidebarItem[] {
       collapsed: false,
       items: [
         { text: "机器学习基础", link: "/notes/machine-learning" },
+        { text: "Celery 框架快速上手", link: "/notes/celery" },
         { text: "Python基础", link: "/notes/python-basic" },
         { text: "Linux系统编程", link: "/notes/linux-system" },
         { text: "Linux网络编程", link: "/notes/linux-network" },
