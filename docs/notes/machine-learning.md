@@ -532,33 +532,241 @@ plt.show()
 
 ## 深度学习（Deep Learning）
 
-### 神经网络
+### 神经元
+
+神经网络的灵感来自大脑神经元：接收多个输入信号，加权整合，超过阈值就"激活"输出。数学上一个人工神经元就是：$z = w_1x_1 + w_2x_2 + \cdots + w_dx_d + b = w^Tx + b$，$a = f(z)$
+
+- $w$：权重（连接强度），$b$：偏置（激活难易程度）
+- $f$：**激活函数**（非线性变换）
+- **一个神经元 + sigmoid 激活 = 逻辑回归**。神经网络本质上就是把成千上万个"逻辑回归单元"层层堆叠、首尾相连。
+
+**如果没有激活函数（或用线性激活），无论堆多少层，整体都等价于一个单层线性模型**（矩阵连乘仍是矩阵）。非线性激活是神经网络能拟合复杂函数的根本原因。
+
+| 激活函数       | 公式                             | 导数                      | 特点                                                         |
+| -------------- | -------------------------------- | ------------------------- | ------------------------------------------------------------ |
+| **ReLU**       | $\max(0, z)$                     | $z>0$ 为 1，否则 0        | **隐藏层默认选择**；缺点：$z<0$ 时梯度为 0（"死亡 ReLU"）    |
+| **Leaky ReLU** | $\max(\alpha z, z)$              | $z>0$ 为 1，否则 $\alpha$ | 给负区间一个小斜率（如 0.01），解决死亡 ReLU                 |
+| **Sigmoid**    | $\frac{1}{1+e^{-z}}$             | $\sigma(z)(1-\sigma(z))$  | 输出 (0,1) 可作概率；两端梯度≈0 导致**梯度消失**；现主要用于输出层（二分类） |
+| **Softmax**    | $\frac{e^{z_k}}{\sum_j e^{z_j}}$ | —                         | 多分类输出层专用，输出概率分布                               |
+
+### 神经网络与前向传播
+
+- **单层感知机**：单个神经元模型（只有输入层 + 输出层，无隐藏层，激活函数为跃迁函数，无法解决XOR线性不可分）
+- **多层感知机（MLP）**：感知机叠加隐藏层 + 非线性激活 + 反向传播训练，即"经典的前馈全连接神经网络"
+- **神经网络**：一般由输入层、隐藏层、输出层构成——MLP 是最基础的一种，还有 CNN、RNN、Transformer 等变体
+
+![QQ20260818-095303](../assets/notes/machine-learning/QQ20260818-095303.jpg)
+
+- **输入层**：接收特征，不算"层数"
+- **隐藏层**：自动学习数据的中间特征表示（深度学习的"深度"就指隐藏层多）
+- **输出层**：按任务设计
+
+> [!note]
+>
+> 理论上：**一个隐藏层 + 足够多的神经元 + 非线性激活，可以逼近任意连续函数**。但"能逼近"不等于"容易训练"，实践中用更深的网络换取参数效率。
+
+以一个隐藏层的网络为例，前向传播（矩阵形式，$X$ 形状 $n\times d$，$n$ 样本，$d$ 特征）：
+
+$$Z^{[1]} = XW^{[1]} + b^{[1]}, \qquad A^{[1]} = \text{ReLU}(Z^{[1]})$$
+$$Z^{[2]} = A^{[1]}W^{[2]} + b^{[2]}, \qquad \hat{Y} = A^{[2]} = g(Z^{[2]})$$
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+def load_coffee_data():
+    """ Creates a coffee roasting data set.
+        roasting duration: 12-15 minutes is best
+        temperature range: 175-260C is best
+    """
+    rng = np.random.default_rng(2)
+    X = rng.random(400).reshape(-1, 2)
+    X[:, 1] = X[:, 1] * 4 + 11.5  # 12-15 min is best
+    X[:, 0] = X[:, 0] * (285 - 150) + 150  # 350-500 F (175-260 C) is best
+    Y = np.zeros(len(X))
+
+    i = 0
+    for t, d in X:
+        y = -3 / (260 - 175) * t + 21
+        if (t > 175 and t < 260 and d > 12 and d < 15 and d <= y):
+            Y[i] = 1
+        else:
+            Y[i] = 0
+        i += 1
+
+    return (X, Y.reshape(-1, 1))
+
+X, Y = load_coffee_data()
+u = X.mean(axis=0)
+sigma = X.std(axis=0)
+X = (X - u) / sigma
+print(f"Temperature Max, Min post normalization: {np.max(X[:,0]):0.2f}, {np.min(X[:,0]):0.2f}")
+print(f"Duration    Max, Min post normalization: {np.max(X[:,1]):0.2f}, {np.min(X[:,1]):0.2f}")
+print(X.shape, Y.shape)
+
+neg_pos = np.where(Y == 0)
+pos_pos = np.where(Y == 1)
+plt.scatter(X[neg_pos, 0], X[neg_pos, 1], marker='x', c='r')
+plt.scatter(X[pos_pos, 0], X[pos_pos, 1], marker='o', c='b')
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+def my_dense(a_in, W, b):
+    return sigmoid(a_in @ W + b)
+
+def forward_prop(X):
+    W1_tmp = np.array([[-8.93, 0.29, 12.9], [-0.1, -7.32, 10.81]])
+    b1_tmp = np.array([-9.82, -9.28, 0.96])
+    W2_tmp = np.array([[-31.18], [-27.59], [-32.56]])
+    b2_tmp = np.array([15.41])
+    A1 = my_dense(X, W1_tmp, b1_tmp)
+    A2 = my_dense(A1, W2_tmp, b2_tmp)
+    return A2
+
+X_tst = np.array([
+    [200,13.9],  # postive example
+    [200,17]])   # negative example
+X_tst = (X_tst - u) / sigma
+predictions = forward_prop(X_tst)
+print(predictions)
+yhat = (predictions > 0.5).astype(int)
+print(yhat)
+plt.show()
+```
+
+### 反向传播 Back propagation
+
+前向传播算出预测和损失；反向传播用**链式法则**从输出层往回，逐层算出每个参数对损失的梯度，然后用梯度下降更新。
+
+```
+前向传播(forward) → 计算损失(loss) → 反向传播(backward) → 参数更新(update)
+```
+
+链式法则： $\frac{\partial L}{\partial W^{[1]}} = \frac{\partial L}{\partial \hat{y}} \cdot \frac{\partial \hat{y}}{\partial Z^{[2]}} \cdot \frac{\partial Z^{[2]}}{\partial A^{[1]}} \cdot \frac{\partial A^{[1]}}{\partial Z^{[1]}} \cdot \frac{\partial Z^{[1]}}{\partial W^{[1]}}$
+
+* 两层网络的标准反向传播公式（交叉熵 + softmax/sigmoid）
+
+定义每层的误差项 $\delta$，从后往前递推：
+
+$\delta^{[2]} = \hat{Y} - Y \quad (\text{输出层，标准搭配下的漂亮结果})$
+
+$\frac{\partial L}{\partial W^{[2]}} = \frac{1}{n}(A^{[1]})^T\delta^{[2]}, \qquad \frac{\partial L}{\partial b^{[2]}} = \frac{1}{n}\sum\delta^{[2]}$
+
+$\delta^{[1]} = \big(\delta^{[2]}(W^{[2]})^T\big) \odot g'(Z^{[1]}) \quad (\odot \text{是逐元素乘})$
+
+$\frac{\partial L}{\partial W^{[1]}} = \frac{1}{n}X^T\delta^{[1]}，\qquad \frac{\partial L}{\partial b^{[1]}} = \frac{1}{n}\sum\delta^{[1]}$
+
+**规律**：本层误差 = 后层误差"穿过"权重传回来 × 本层激活的导数；参数梯度 = 本层误差 × 本层输入。
+
+![均方误差+线性激活反向传播计算图](../assets/notes/machine-learning/IMG_20260821_153452.jpg)
+
+### 代码实现
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
 
 
+def load_coffee_data():
+    pass # 同前向传播
+
+X, Y = load_coffee_data()
+u = X.mean(axis=0)
+sigma = X.std(axis=0)
+X = (X - u) / sigma
+print(f"Temperature Max, Min post normalization: {np.max(X[:,0]):0.2f}, {np.min(X[:,0]):0.2f}")
+print(f"Duration    Max, Min post normalization: {np.max(X[:,1]):0.2f}, {np.min(X[:,1]):0.2f}")
+print(X.shape, Y.shape)
+
+m, n = X.shape
+J_history = []
+# INPUT(m, 2) --> Hidden layer(3个神经元,ReLU) --> Output layer(1个神经元,Sigmoid+二元交叉熵)
+
+W1 = np.array([[-8.93, 0.29, 12.9], [-0.1, -7.32, 10.81]])
+b1 = np.array([-9.82, -9.28, 0.96])
+W2 = np.array([[-31.18], [-27.59], [-32.56]])
+b2 = np.array([15.41])
+
+# --- 随机初始化，从头训练 ---
+# np.random.seed(0)  # 固定随机种子，保证每次运行结果可复现
+# W1 = np.random.randn(2, 3) * np.sqrt(2 / 2)  # He 初始化：ReLU 激活推荐 √(2/n_in)
+# b1 = np.zeros(3)
+# W2 = np.random.randn(3, 1) * np.sqrt(2 / 3)
+# b2 = np.zeros(1)
+
+def sigmoid(x):
+    x = np.clip(x, -500, 500)
+    return 1 / (1 + np.exp(-x))
+
+def ReLU(x):
+    return np.maximum(0, x)
 
 
+def back_prop(X, Y, W1, b1, W2, b2, lr):
+    # forward prop
+    # (m,2) (2, 3)
+    Z1 = X @ W1 + b1
+    A1 = ReLU(Z1)
+    # (m, 3) (3, 1)
+    Z2 = A1 @ W2 + b2
+    y_hat = sigmoid(Z2)
 
+    y_hat = np.clip(y_hat, 1e-9, 1-1e-9)
+    cost = -np.sum(Y * np.log(y_hat) + (1 - Y) * np.log(1 - y_hat)) / m
+    J_history.append(cost)
 
+    # back prop
+    # (m, 1)
+    dZ2 = y_hat - Y
 
+    dW2 = (A1.T @ dZ2) / m
+    db2 = np.mean(dZ2, axis=0)
+    # db2_test = np.mean(dZ2, axis=0, keepdims=True)
+    # print(b2, db2, db2_test)
 
+    dZ1 = (dZ2 @ W2.T) * (Z1 > 0)
+    dW1 = (X.T @ dZ1) / m
+    db1 = np.mean(dZ1, axis=0)
+    # print(b1, db1)
 
+    W1 = W1 - lr * dW1
+    b1 = b1 - lr * db1
+    W2 = W2 - lr * dW2
+    b2 = b2 - lr * db2
+    return W1, b1, W2, b2
 
+lr = 0.01
+epochs = 1000
 
+for _ in range(epochs):
+    W1, b1, W2, b2 = back_prop(X, Y, W1, b1, W2, b2, lr)
 
+plt.plot(J_history)
+plt.xlabel("Epoch")
+plt.ylabel("Cost")
+plt.show()
+```
 
+### 训练常见问题
 
+#### 参数初始化
 
+* 参数初始化0或相同值时所有神经元会永远学出相同特征（对称性无法打破）
+* 常用：Xavier 初始化（适合 tanh）、He 初始化（适合 ReLU），按层宽缩放方差
 
+#### 梯度消失 / 梯度爆炸
 
+- 反向传播连乘很多小导数 → 浅层梯度趋近 0，梯度消失**
+- 对策：ReLU 激活、**Batch Normalization**、残差连接（ResNet）、合理初始化、梯度裁剪
 
+#### 过拟合
 
+- **Dropout**：训练时随机"关掉"一部分神经元，强迫网络不依赖单个神经元
+- L2 正则（weight decay）、早停（early stopping）、数据增强
 
+#### 优化器
 
-
-
-
-
-
+SGD（Stochastic Gradient Descent，随机梯度下降）→ Momentum（动量加速）→ **Adam**（自适应学习率）
 
 
 
