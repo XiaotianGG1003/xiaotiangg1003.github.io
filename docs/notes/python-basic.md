@@ -1,3 +1,7 @@
+---
+title: python基础
+---
+
 # python基础
 
 ## 基础语法
