@@ -31,7 +31,7 @@ title: 机器学习基础
 - **聚类（Clustering）**：把相似样本归为一组，组内相似、组间差异大。如用户分群、新闻聚合、图像分割。
 - **降维（Dimensionality Reduction）**：把高维数据压缩到低维，保留主要信息。目的：去噪、加速计算、可视化、缓解"维度灾难"。
 - **异常检测（Anomaly Detection）**：找出与大多数样本明显不同的"离群点"。如信用卡欺诈检测、设备故障预警。
-- **关联规则挖掘（Association Rules）**：发现事物之间的共现关系。经典例子："啤酒与尿布"购物篮分析。
+- **关联规则挖掘（Association Rules）**：发现事物之间的共现关系。
 
 
 
@@ -504,9 +504,9 @@ $$\text{Var}(\text{森林}) = \rho\sigma^2 + \frac{1-\rho}{B}\sigma^2$$
 最终预测 = 所有树的加权求和
 ```
 
-GBDT 每一轮（第 $i$ 棵树）拟合的是：\[ r_i^{(t)} = - \left[ \frac{\partial L(y_i,\hat y_i)} {\partial \hat y_i} \right]_{\hat y_i=\hat y_i^{(t-1)}} \] 即**损失函数关于预测结果的负梯度**。
+GBDT 每一轮（第 $i$ 棵树）拟合的是：$$ r_i^{(t)} = - \left[ \frac{\partial L(y_i,\hat y_i)} {\partial \hat y_i} \right]_{\hat y_i=\hat y_i^{(t-1)}} $$ 即**损失函数关于预测结果的负梯度**。
 
-对于平方误差损失 \[ L(y,\hat y)=\frac12(y-\hat y)^2 \] 。求梯度：\[ \frac{\partial L}{\partial \hat y} = \hat y-y \] ，负梯度就是：\[ -\frac{\partial L}{\partial \hat y} = y-\hat y \] 刚好就是**残差**。即下一棵树拟合上一轮的残差，每棵新树专门拟合前面所有树预测剩下的"没解释干净的部分"。
+对于平方误差损失 $$ L(y,\hat y)=\frac12(y-\hat y)^2 $$ 。求梯度：$$ \frac{\partial L}{\partial \hat y} = \hat y-y $$ ，负梯度就是：$$ -\frac{\partial L}{\partial \hat y} = y-\hat y $$ 刚好就是**残差**。即下一棵树拟合上一轮的残差，每棵新树专门拟合前面所有树预测剩下的"没解释干净的部分"。
 
 ```
 1. 初始化: F₀(x) = 所有 y 的均值（或常数 c 最小化损失）
@@ -527,13 +527,13 @@ $$\mathcal{L} = \underbrace{\sum_i L(y_i, \hat{y}_i)}_{\text{损失}} + \underbr
 
 - $T$：叶子数，$\gamma$ 控制"长一个新叶子要付出多大代价"（预剪枝）
 - $\lambda$：叶权重 L2 正则
-- \(w_j\)：第 \(j\) 个叶子的预测值
+- $w_j$：第 $j$ 个叶子的预测值
 
 2. **二阶泰勒展开**：更快更准地找最优分裂
 
 GBDT 只用**一阶**梯度（负梯度方向）。XGBoost 把损失在当前位置做**二阶泰勒展开**：
 
-$$\mathcal{L}^{(m)} \approx \sum_i \left[g_i f_m(x_i) + \frac12 h_i f_m^2(x_i)\right] + \Omega(f_m)$$ ，其中 $g_i = \frac{\partial L}{\partial \hat{y}_i}$（一阶）、$h_i = \frac{\partial^2 L}{\partial \hat{y}_i^2}$（二阶）。展开后，叶子节点的最优权重： \[ w_j^* = -\frac{\sum_{i \in \text{leaf}_j} g_i}{\sum_{i \in \text{leaf}_j} h_i + \lambda} \]，最优权重带入函数后得到收益，可以快速计算每个候选分裂能降低多少损失（带来多少收益）。
+$$\mathcal{L}^{(m)} \approx \sum_i \left[g_i f_m(x_i) + \frac12 h_i f_m^2(x_i)\right] + \Omega(f_m)$$ ，其中 $g_i = \frac{\partial L}{\partial \hat{y}_i}$（一阶）、$h_i = \frac{\partial^2 L}{\partial \hat{y}_i^2}$（二阶）。展开后，叶子节点的最优权重： $$ w_j^* = -\frac{\sum_{i \in \text{leaf}_j} g_i}{\sum_{i \in \text{leaf}_j} h_i + \lambda} $$，最优权重带入函数后得到收益，可以快速计算每个候选分裂能降低多少损失（带来多少收益）。
 
 ### SVM 支持向量机
 
@@ -958,45 +958,45 @@ SGD（Stochastic Gradient Descent，随机梯度下降）→ Momentum（动量�
 
 这些任务的特点是**类别分布极不均衡**，即存在**类偏斜**问题（Skewed Class），在多分类任务中也被称为**长尾分布**问题（Long Tailed Distribution。构建一个**混淆矩阵**（Confusion Matrix）会很用，如下
 
-| /                    | 实际为正例 \(P\) | 实际为负例 \(N\) |
+| /                    | 实际为正例 $P$ | 实际为负例 $N$ |
 | -------------------- | ---------------- | ---------------- |
-| **预测为正例 \(P\)** | \(TP\)           | \(FP\)           |
-| **预测为负例 \(N\)** | \(FN\)           | \(TN\)           |
+| **预测为正例 $P$** | $TP$           | $FP$           |
+| **预测为负例 $N$** | $FN$           | $TN$           |
 
-定义**精确率（Precision）**，也称**查准率、精度**，从**预测结果角度**出发，所有预测为正例 \(P\) 的样本中，实际正例的占比：
+定义**精确率（Precision）**，也称**查准率、精度**，从**预测结果角度**出发，所有预测为正例 $P$ 的样本中，实际正例的占比：
 
-\[
+$$
 Precision \triangleq \frac{TP}{TP+FP}
-\]
+$$
 
-定义**召回率（Recall）**，也称**查全率**，从**实际结果角度**出发，所有实际为正例 \(P\) 的样本中，被预测为正例的占比：
+定义**召回率（Recall）**，也称**查全率**，从**实际结果角度**出发，所有实际为正例 $P$ 的样本中，被预测为正例的占比：
 
-\[
+$$
 Recall \triangleq \frac{TP}{TP+FN}
-\]
+$$
 Precision 和 Recall 通常是一对矛盾、此消彼长的性能度量指标。一般来说，Precision 越高时，Recall 往往越低，反之亦然。因此**精确率和召回率的权衡**很重要。
 
-以癌症患者识别任务为例，假设我们的算法会输出一个 \([0,1]\) 的概率值，默认以 0.5 作为阈值。如果将一个正常人诊断为癌症患者，则会使其承担不必要的治疗。因此我们可以在保持模型不变的情况下**提高阈值**，如 0.7 或 0.9，进而**提高精确率**——即只在非常有把握的情况下诊断为癌症。然而，如果漏识了一个潜在的癌症患者，带来的灾难可能是更巨大的。因此我们也可以**降低阈值**，进而**提高召回率**——即让所有潜在病人都得到进一步地检查。
+以癌症患者识别任务为例，假设我们的算法会输出一个 $[0,1]$ 的概率值，默认以 0.5 作为阈值。如果将一个正常人诊断为癌症患者，则会使其承担不必要的治疗。因此我们可以在保持模型不变的情况下**提高阈值**，如 0.7 或 0.9，进而**提高精确率**——即只在非常有把握的情况下诊断为癌症。然而，如果漏识了一个潜在的癌症患者，带来的灾难可能是更巨大的。因此我们也可以**降低阈值**，进而**提高召回率**——即让所有潜在病人都得到进一步地检查。
 
 为此，我们定义了一个统一的指标来衡量模型的召回率与精确率，即：
 
-\[
+$$
 \text{F-score}
 =
 (1+\beta^2)
 \frac{\text{Precision}\cdot\text{Recall}}
 {\beta^2\cdot\text{Precision}+\text{Recall}}
-\]
+$$
 
-其中 \(\beta\) 越大表示越强调精确率，反之则强调召回率。当 \(\beta=1\) 时，得到我们最常用的 F1 值（调和平均）：
+其中 $\beta$ 越大表示越强调精确率，反之则强调召回率。当 $\beta=1$ 时，得到我们最常用的 F1 值（调和平均）：
 
-\[
+$$
 \text{F1-score}
 =
 2\cdot
 \frac{\text{Precision}\cdot\text{Recall}}
 {\text{Precision}+\text{Recall}}
-\]
+$$
 
 对于一个模型来说，如果想要在精确率和召回率之间取得一个较好的平衡，最大化 F1 值是一个有效的方法。
 
@@ -1005,6 +1005,494 @@ Precision 和 Recall 通常是一对矛盾、此消彼长的性能度量指标�
 
 
 ## 聚类（Clustering）
+
+无监督学习的数据不再包含标注的标签，即采用**完全无标注的数据集**。其中聚类问题属于无监督学习的范畴，其目的是在无标注的情况下将样本集划分为若干类。
+
+聚类问题其本质是「根据**样本之间的相似度**，将数据进行归类」，由于没有显式的标签，唯一的依据就是样本之间的相似度。而相似度的度量方法，可以大致分为：
+
+- 距离相似性度量：以欧式距离为代表的各种距离、余弦相似度等。
+- 密度相似性度量：以 KL 散度为代表的各种熵。
+- 连通相似性度量：以杰卡德指数为代表的各种统计量，在集合与图背景下更为常用。
+
+由以上度量方法引申出的聚类算法也有很多：
+
+1. 基于**划分**的聚类：K-Means、K-Means++、Bisecting K-Means 等。
+2. 基于**密度**的聚类：DBSCAN、Mean Shift、OPTICS 等。
+3. **层次**聚类：DIANA、AGNES、HDBSCAN、Agglomerative、Divisive 等。
+4. 基于**图**的聚类：Chinese Whisper、CDP 等。
+
+### 聚类评价指标
+
+如何评价一个无监督的算法？和有监督类似，需要一个测试集，但无监督算法的测试集则有无标签都可以。针对数据**有类别标签**的情况，最常用的评价指标有两种：
+
+- **均一性：**每个聚簇中正确分类的样本数占该聚簇总样本数的比例和，类似于**精确率**，如果一个簇中只包含一个类别的样本，则称其满足均一性。
+- **完整性**：每个聚簇中正确分类的样本数占该类型的总样本数比例的和，类似于**召回率**，同类别样本被归类到相同簇中，则称其满足完整性。
+
+同样，将上述二者加权平均，就能得到类似  $F-Score$ 的 $V-Score$ 。此外，还有：
+
+- **调节兰德系数**（Adjusted Rand index，ARI）：计算聚类结果与实际划分的**重叠程度**，重叠程度越高表示聚类效果越好。
+- **归一化互信息**（Normalized Mutual Information，NMI）：计算聚类结果的**簇内互信息**，值越大表示聚类结果越相近，效果越好。
+
+对于无类别标签的情况，最常用的指标是**轮廓系数**（Silhouette Coefficient），结合了**内聚度**（Compactness）和**分离度**（Separation）两种因素。简单来说，就是希望簇内样本尽量相近，簇间样本尽量相远。
+
+### K-Means 
+
+**K-Means** 算法目的在于寻找最优的 $K$ 个**聚类中心**，并将每个样本点归到距离最近的中心点，而聚类中心的优劣显然就取决于能否**使距离之和最小化**。
+
+如果已知每个样本点的所属类，那很容易就能算出中心（即**质心**）。如果已知每个类的中心，那么也很容易进行分类（按**距离**归类）。通过交替迭代计算，直到收敛，算法如下。
+
+#### 算法
+
+随机初始化 $K$ 个聚类中心：$\mu_1, \mu_2, \ldots, \mu_K$
+
+**重复执行**直到聚类中心不再改变：
+
+1. 将样本点分配到聚类中心
+
+   对于 $i = 1$ 到 $m$：
+
+   ​	$c^{(i)}$ := 与 $x^{(i)}$ 距离最近的聚类中心的索引（从 1 到 $K$）
+
+2. 更新聚类中心
+
+   对于 $k = 1$ 到 $K$：
+
+   ​	$\mu_k$ := 分配给第 $k$ 个聚类的所有点的平均值（均值）
+
+- $K$：聚类的数量，即需要将数据划分为多少个簇。
+- $\mu_k$：第 $k$ 个聚类中心（质心），表示该簇当前的中心位置。
+- $m$：样本总数，即数据集中一共有多少个样本点。
+- $x^{(i)}$：第 $i$ 个样本点。
+- $c^{(i)}$：第 $i$ 个样本所属聚类的编号，其取值范围为 $1$ 到 $K$。
+- $k$：聚类索引，用于表示第 $k$ 个聚类。
+- $\mu_k$：当前被分配到第 $k$ 个簇的所有样本点的平均值。
+
+#### 优化目标
+
+最小化各数据点到它所属于的聚类中心的距离， $\min
+J(c^{(1)},\ldots,c^{(m)},\mu_1,\ldots,\mu_K)$
+$$
+J(c^{(1)}, \ldots, c^{(m)}, \mu_1, \ldots, \mu_K) = \frac{1}{m} \sum_{i=1}^{m} \left\|x^{(i)}-\mu_{c^{(i)}}\right\|^2
+$$
+2、3 两个步骤都是在减小这个代价：第 2 步减小  $c^{(i)}$ 引起的代价，第 3 步减小 $\mu^{(i)}$ 引起的代价。所以代价应随着迭代次数增加而减小，虽然不是凸函数，但是也可以收敛到局部最优解。
+
+#### 初始化K均值
+
+* 为了避免 K-means 因随机初始化不同而得到较差的局部最优解，可以进行多次随机初始化，并选择代价函数最小的一次结果。
+
+对于 $i = 1$ 到 $100$：
+
+1. 随机初始化 K-means 的聚类中心，从训练样本中随机选择 $K$ 个样本作为初始聚类中心。
+
+2. 运行 K-means 算法，得到：$c^{(1)}, \ldots, c^{(m)}, \mu_1, \ldots, \mu_K$
+
+3. 计算代价函数（失真函数）：$J(c^{(1)}, \ldots, c^{(m)}, \mu_1, \ldots, \mu_K)$
+
+重复多次后，选择代价函数 $J$ 最小的那次聚类结果。
+
+* 随机初始化若两个质心都落在同一堆里，收敛到很差的局部最优。**K-Means++** 改进初始化，其核心思想是：**逐个选取聚类中心，且其他距离现有中心越远的样本点越有可能被选为下一个聚类中心。**
+
+1. 首先随机选取第一个初始聚类中心 $\mu_1$
+
+2. 计算每个样本与当前已有聚类中心之间的**最短距离**，用 $D(x^{(i)})$ 表示，则该样本被选取为下一个聚类中心的**概率**为 $P(x^{(i)})$；
+
+3. 重复第 2 步，直到选出 $K$ 个初始聚类中心。
+
+其中概率 $P(x^{(i)})$ 的计算方法为：
+
+$$
+P(x^{(i)})
+=
+\frac{D(x^{(i)})}
+{\sum_{j=1}^{m}D(x^{(j)})}
+$$
+
+> 注意，K-Means++ 选点是基于概率，而非直接选择距离最远的点，因为这样很容易陷入离群点，导致一个离群点被单独聚为一类。
+
+#### 选择聚类数量
+
+在实践中，我们可以任取 $K < m$ 个数据点作为聚类中心。随着聚类簇数  $K$ 不断增大，样本数据划分会逐渐变得更加精细；因此，随着  $K$ 不断增大，每个簇的聚合程度会逐渐提高，代价函数 SSE 会逐渐变小。极端情况下，当  $K=m$ 时，每个样本自成一簇，此时代价函数为 $0$。
+
+绘制出代价函数关于簇数的变化曲线：
+
+![代价函数关于簇数的变化曲线](../assets/notes/machine-learning/202909241127.png)
+
+观察上图，我们发现当 $K$ 小于「合适的簇数」时，代价函数下降的幅度极大；而当  大于「合适的簇数」时，下降的幅度又逐渐变缓。曲线呈现出「手肘」形状，因此人们通常以**手肘法则**（Elbow Method）为依据来指导选择这个超参数。
+
+**轮廓系数**：$s = \frac{b-a}{\max(a,b)}$，$a$ = 样本与同簇平均距离，$b$ = 与最近异簇平均距离。$s \in [-1,1]$，越大聚类越好；对多个 K 取平均轮廓系数最大的。
+
+> 实际使用中通常会根据**下游目标的表现和业务需求**来综合评估选择合适的簇数
+
+#### 代码
+
+```python
+from scipy.io import loadmat
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+
+def J(X, c, mu):
+    tmp = mu[c]
+    m = X.shape[0]
+    return np.sum((X - tmp)**2) / m
+
+def K_Means(X, K, times=100):
+    (m, n) = X.shape
+
+    best_cost = np.inf
+    best_mu = np.empty((K, n))
+    best_c = np.empty(m)
+    for _ in range(times):
+        mu = X[np.random.choice(range(m), K, replace=False)]
+        c = np.empty(m, dtype=int)
+        while True:
+            new_mu = np.zeros((K, n))
+            cnt = np.zeros(K)
+            for i in range(m):
+                c[i] = np.argmin(np.linalg.norm(X[i] - mu, axis=1))
+                new_mu[c[i]] += X[i]
+                cnt[c[i]] += 1
+
+            new_mu[cnt != 0] = new_mu[cnt != 0] / cnt[cnt != 0].reshape((-1,1))
+            new_mu[cnt == 0] = X[np.random.choice(range(m), len(cnt[cnt == 0]), replace=False)]
+            if (mu == new_mu).all():
+                break
+            mu = new_mu
+
+        cost = J(X, c, mu)
+        if cost < best_cost:
+            best_cost = cost
+            best_mu = mu
+            best_c = c
+
+    return best_cost, best_mu, best_c
+
+data = loadmat("./dataset/ex7data2.mat")
+print(data.keys())
+X = data["X"]
+
+cost, mu, c = K_Means(X, 3, 100)
+
+plt.xlabel('x1')
+plt.ylabel('x2')
+plt.plot(X[c==0][:, 0], X[c==0][:, 1], 'o', color='blue', markerfacecolor='none')
+plt.plot(X[c==1][:, 0], X[c==1][:, 1], 'o', color='green', markerfacecolor='none')
+plt.plot(X[c==2][:, 0], X[c==2][:, 1], 'o', color='red', markerfacecolor='none')
+# plt.plot(X[c==3][:, 0], X[c==3][:, 1], 'o', color='black', markerfacecolor='none')
+plt.plot(mu[0, 0], mu[0, 1], '*', color='blue', ms=10)
+plt.plot(mu[1, 0], mu[1, 1], '*', color='green', ms=10)
+plt.plot(mu[2, 0], mu[2, 1], '*', color='red', ms=10)
+# plt.plot(mu[3, 0], mu[3, 1], '*', color='black', ms=10)
+plt.plot([], [], '*', color='black', ms=10, label='cluster centroid')
+plt.legend()
+plt.show()
+```
+
+结果如下
+
+![k-means](../assets/notes/machine-learning/20260928144045384.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 异常检测（Anomaly Detection）
+
+异常检测的特点在于其假设样本特征服从**高斯分布**（Gaussian Distribution），而异常点通常偏离正常数据，且可能性较低。
+
+传统的异常检测通过**手工选择特征**，并假设这些特征都服从高斯分布（正态分布） $x \sim N(\mu,\sigma^2)$，则其**概率密度函数**：
+
+$$
+P(x;\mu,\sigma^2) = \frac{1}{\sqrt{2\pi\sigma}} \exp\left (-\frac{(x-\mu)^2}{2\sigma^2} \right)
+$$
+
+其中：
+
+- $\mu$ 是样本均值，代表分布的中心；
+- $\sigma^2$ 是样本方差，代表样本偏离中心的程度，$\sigma$ 越小，概率密度曲线就越瘦高；
+- 概率密度函数满足：$$ \int_{-\infty}^{+\infty} P(x;\mu,\sigma^2)\,dx = 1$$
+
+### 多元高斯分布
+
+一个样本往往含有多个特征，多个特征组成的分布就是**多元高斯分布**（Multivariate Gaussian Distribution）。通常，我们朴素地假设 $x$ 的各个特征维度**互不相关**，则联合概率密度函数等于各分量的概率密度函数之积，即：
+
+$$
+P(x;\mu,\Sigma) = \prod_{i=1}^{n} P(x_i;\mu_i,\sigma_i^2) =
+\frac{1}{(2\pi)^{n/2}\prod_{i=1}^{n}\sigma_i}
+\exp\left( -\frac{1}{2} \sum_{i=1}^{n}\frac{(x_i-\mu_i)^2}{\sigma_i^2} \right)
+$$
+
+而对于其中的指数部分，可以表示为矩阵乘法的形式：
+
+$$
+\xi^2(x,\mu,\sigma) = \sum_{i=1}^{n} \left( \frac{x_i-\mu_i}{\sigma_i} \right)^2 \\
+= \sum_{i=1}^{n} (x_i-\mu_i)(x_i-\mu_i) \left( \frac{1}{\sigma_i} \right)^2 \\
+= [x_1-\mu_1,\;x_2-\mu_2,\;\cdots,\;x_n-\mu_n] 
+\begin{bmatrix}
+\frac{1}{\sigma_1^2} & 0 & \cdots & 0 \\
+0 & \frac{1}{\sigma_2^2} & \cdots & 0 \\
+\vdots & \vdots & \ddots & \vdots \\
+0 & 0 & \cdots & \frac{1}{\sigma_n^2}
+\end{bmatrix}
+\begin{bmatrix}
+x_1-\mu_1 \\
+x_2-\mu_2 \\
+\vdots \\
+x_n-\mu_n
+\end{bmatrix} \\
+= (x-\mu)^T\Sigma^{-1}(x-\mu)
+$$
+
+* 如果各特征相互独立，那么协方差矩阵为对角矩阵：
+
+$$
+\Sigma =
+\begin{bmatrix}
+\sigma_1^2 & 0 & \cdots & 0 \\
+0 & \sigma_2^2 & \cdots & 0 \\
+\vdots & \vdots & \ddots & \vdots \\
+0 & 0 & \cdots & \sigma_n^2
+\end{bmatrix}
+$$
+
+* 我们假设“**各个特征互不相关/独立**”，所以 $\Sigma$ 是对角矩阵。但真正的一般多元高斯分布**不要求特征独立**。如果特征之间存在相关性，$\Sigma$ 中就会出现非零的非对角元素
+
+![在不改变原有方差的基础上，增加两者之间的相关性](../assets/notes/machine-learning/202609291031.png)
+
+### 算法
+
+1. 选择 $n$ 个你认为能够反映异常样本的特征 $x_i$。
+
+2. 拟合参数：$\mu_1,\ldots,\mu_n,\sigma_1^2,\ldots,\sigma_n^2$ ，对于第 $j$ 个特征：
+
+$$
+\mu_j = \frac{1}{m} \sum_{i=1}^{m} x_j^{(i)} \\
+\sigma_j^2 = \frac{1}{m} \sum_{i=1}^{m} \left( x_j^{(i)}-\mu_j \right)^2
+$$
+
+3. 给定一个新的样本 $x$，计算其概率 $p(x)$：
+
+$$
+p(x) = \prod_{j=1}^{n} p(x_j;\mu_j,\sigma_j^2) = \prod_{j=1}^{n} \frac{1}{\sqrt{2\pi}\sigma_j} \exp \left( -\frac{(x_j-\mu_j)^2}{2\sigma_j^2} \right)
+$$
+
+如果：$p(x)<\varepsilon$ ，则判定该样本为**异常样本（Anomaly）**。
+
+### 特征选择
+
+异常检测假设特征符合高斯分布，如果数据的分布不是高斯分布，我们通常先将数据转换成高斯分布。通常需要先画出特征分布的直方图，如果数据呈现**偏态分布**（Skewed Distribution）
+
+![两种偏态分布](../assets/notes/machine-learning/202609291121.jpeg)
+
+常用的转换方式有：对数变换、指数（平方根、倒数）变换、正反旋变换等
+
+![对数变换](../assets/notes/machine-learning/202609291122.png)
+
+### 训练和验证
+
+如果我们有标注过的数据（标注是否异常），则可以将数据划分为训练集、验证集和测试集。
+
+1. 训练集包含大部分**正常数据**，并据此构建出正态分布模型；
+2. 验证集和测试集包含**正常和异常数据**；
+3. 根据验证集的结果**调整参数** ，最后在测试集上进行测试。
+
+此外，由于异常检测数据集通常**分布不均**（正常数据远远多于异常数据），所以实验指标应该取 $Percision、Recall、F1$ 等值。
+
+### 误差分析
+
+在通过上述流程后，如果模型效果仍然不好，则需要进行误差分析。
+
+一个常见的问题是：一些异常的数据可能也会有较高的 $P(x)$ 值，从而被算法认为是正常的。这种情况下我们应该去分析那些被算法错误预测的数据，观察其特征的选择是否存在问题。考虑更换特征、或将已有的特征进行组合以获取更好的特征。
+
+### 代码
+
+```python
+import numpy as np
+from scipy.io import loadmat
+from scipy.stats import multivariate_normal
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+
+data = loadmat("./dataset/ex8data1.mat")
+print(data.keys())
+
+X = data['X']
+Xval = data['Xval']
+yval = data['yval']
+m, n = X.shape
+
+Xval, Xtest, yval, ytest = train_test_split(Xval, yval,test_size=0.5)
+
+Xmeans = X.mean(axis=0)
+Xcov = (X - Xmeans).T @ (X - Xmeans) / m
+normal = multivariate_normal(Xmeans, Xcov)
+
+pdfX =  normal.pdf(X)
+pdfXval = normal.pdf(Xval)
+pdfXtest = normal.pdf(Xtest)
+
+best_f1, best_eps = 0, 0
+for eps in np.linspace(pdfXval.min(), pdfXval.max(), 1000):
+    f1 = f1_score(yval, pdfXval < eps)
+    if f1 > best_f1:
+        best_f1 = f1
+        best_eps = eps
+
+print(f"best eps: {best_eps}")
+print(f"f1 on test set: {f1_score(ytest, pdfXtest < best_eps)}")
+
+plt.plot(X[:, 0], X[:, 1], 'x', color='blue', alpha=0.5)
+plt.plot(X[pdfX < best_eps, 0], X[pdfX < best_eps, 1], 'o', color='red', ms=10, markerfacecolor='None')
+plt.show()
+```
+
+![image-20260929144918153](../assets/notes/machine-learning/20260929144918153.png)
+
+## 降维（Dimensionality Reduction）
+
+### **主成分分析 **Principal Component Analysis
+
+#### 推导
+
+目标是找一个最优的 $k$ 维子空间，把原来的 $n$ 维数据投影到这个 $k$ 维子空间后，**损失的信息最少**。
+
+设样本 $x\in\mathbb R^n$，选择一组标准正交基 $u_1,\dots,u_n$，新坐标为 $$ y_r=u_r^Tx. $$，如果只保留前 $k$ 维，那么被丢掉的部分是$$ y_{k+1},\dots,y_n, $$所以单个样本的重构误差为 $$ y_{k+1}^2+\cdots+y_n^2. $$ ，对所有样本，我们希望
+$$
+\min \sum_{i=1}^m\sum_{r=k+1}^n (y_r^{(i)})^2 = \max \sum_{i=1}^m\sum_{r=1}^k(y_r^{(i)})^2 =  \max \sum_{r=1}^k u_r^T X^TXu_r
+$$
+由于正交变换不改变向量长度， $$ \sum_{r=1}^n(y_r^{(i)})^2=\|x^{(i)}\|^2 $$是固定的，所以：**最小化丢失部分 $\iff$ 最大化保留部分**
+
+又因为 $$ y_r^{(i)}=u_r^Tx^{(i)}, $$所以
+$$
+\sum_{i=1}^m(y_r^{(i)})^2 = u_r^T \left( \sum_{i=1}^m x^{(i)}x^{(i)T} \right) u_r = u_r^T X^TXu_r
+$$
+若数据矩阵 $X$ 的每一行是一个样本，于是问题变成： $$ \max \sum_{r=1}^k u_r^T X^TXu_r, $$
+
+接下来对 $$ X^TX $$，做特征分解：$$ X^TX=Q\Lambda Q^T, $$其中 $$ \lambda_1\ge\lambda_2\ge\cdots\ge\lambda_n, $$对应特征向量为$$ q_1,q_2,\dots,q_n. $$
+
+因此 PCA 的最优 $k$ 维子空间就是 $$ \operatorname{span}\{q_1,\dots,q_k\} $$ ，也就是：$$ X^TX $$ 最大 $$ k $$ 个特征值对应的特征向量，组成投影矩阵
+
+$$ C=[q_1,\dots,q_k]. $$ 最终降维：$$ Z=XC $$
+
+实际 PCA 一般先对数据中心化，所以 $X^TX$ 与协方差矩阵只差一个常数倍，因此也常说：PCA 就是求**协方差矩阵最大的 $$ k $$ 个特征向量**
+
+#### 算法步骤
+
+1. 计算矩阵 $$ X^TX $$或者样本的协方差矩阵
+2. 进行奇异值分解，得到奇异向量
+3. 选取前 $k$ 个奇异向量作为降维后的空间的基向量，构成基变换矩阵 $$ C_{n\times k} $$
+
+4. 对于原数据 $\mathbf{x}$，取 $$ \mathbf{z}=\mathbf{C}^T\mathbf{x} $$ 为其降维后的数据。更简单的表达是取 $$ \mathbf{Z}_{m\times k} = \mathbf{X}_{m\times n}\mathbf{C}_{n\times k} $$，则 $\mathbf{Z}_{m\times k}$ 是降维后的数据集。
+
+
+> PCA 的算法过程中完全无超参数参与，不需要人为进行干预，最后的结果只与数据有关。这既是优点也是缺点，缺点在于难以利用已有先验进行额外的干预。
+
+#### 重建压缩数据
+
+作为一种压缩算法，主成分分析也有解压缩的过程，将低维数据还原到高维数据的**近似值**，假设我们有压缩后的数据 $\mathbf{z}\in\mathbb{R}^k$，则 $\mathbf{x}\approx\mathbf{x}_{\mathrm{approx}} = \mathbf{C}_{n\times k}\mathbf{z}$
+
+![重建压缩数据](../assets/notes/machine-learning/202610080945.png)
+
+#### 主成分数量的选择
+
+定义一个**平均误差**为： $$ \frac{1}{m}\sum_{i=1}^{m} \left\| \mathbf{x}^{(i)}-\mathbf{x}_{\mathrm{approx}}^{(i)}\right\|^2 $$ ，其中，$\mathbf{x}_{\mathrm{approx}}^{(i)}$ 表示数据 $\mathbf{x}^{(i)}$ 在我们找到的 $k$ 维子空间上的投影。再定义一个**总方差**为：$$ \frac{1}{m}\sum_{i=1}^{m} \left\| \mathbf{x}^{(i)} \right\|^2 $$
+
+则一般的，我们会选择最小的 $k$ 使得：
+
+$$
+\frac{
+\frac{1}{m}\sum_{i=1}^{m}
+\left\|
+\mathbf{x}^{(i)}-\mathbf{x}_{\mathrm{approx}}^{(i)}
+\right\|^2
+}{
+\frac{1}{m}\sum_{i=1}^{m}
+\left\|
+\mathbf{x}^{(i)}
+\right\|^2
+}
+\leq 0.01
+$$
+
+并称之为「**99% 的方差得以保留**」，这样能使得丢失的信息最小化。
+
+此外，上述式子看起来并不好计算，但可以证明，对于给定的 $k$，我们可以借助**奇异值**（来自 SVD 分解中的 $\Sigma$ 矩阵）进行计算：
+
+$$
+\frac{
+\frac{1}{m}\sum_{i=1}^{m}
+\left\|
+\mathbf{x}^{(i)}-\mathbf{x}_{\mathrm{approx}}^{(i)}
+\right\|^2
+}{
+\frac{1}{m}\sum_{i=1}^{m}
+\left\|
+\mathbf{x}^{(i)}
+\right\|^2
+}
+=
+1-
+\frac{
+\sum_{i=1}^{k}\sigma_k^2
+}{
+\sum_{i=1}^{n}\sigma_i^2
+}
+$$
+
+由于奇异值衰减非常快，$k$ 不需要很大时上述的值就会低于 $0.01$。
+
+#### 代码
+
+```python
+import matplotlib.pyplot as plt
+from scipy.io import loadmat
+import numpy as np
+
+data = loadmat('./dataset/ex7data1.mat')
+X = data['X']
+print(data.keys())
+print(X.shape)
+
+def PCA(X, dim = -1):
+    X_mean = X.mean(axis=0)
+    X_std = X.std(axis=0)
+    X_norm = (X - X_mean) / X_std
+
+    U, S, V = np.linalg.svd(X_norm.T @ X_norm)
+
+    if dim == -1:
+        dim = 1
+        while S[:dim].sum() / S.sum() < 0.99:
+            dim = dim + 1
+
+    # (m, k)
+    Z = X_norm @ U[:, :dim]
+    Xapprox = (Z @ U[:, :dim].T) * X_std + X_mean
+    return Z, Xapprox
+
+Z, Xapprox = PCA(X, dim=1)
+plt.xlabel('x1')
+plt.ylabel('x2')
+plt.plot(X[:, 0], X[:, 1], 'o', color='black', markerfacecolor='none')
+plt.plot(Xapprox[:, 0], Xapprox[:, 1], 'o', color='red', markerfacecolor='none')
+plt.show()
+```
+
+![PCA](../assets/notes/machine-learning/20261008110626943.png)
+
+
+
+
 
 
 
