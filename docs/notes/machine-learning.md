@@ -158,7 +158,7 @@ $$\begin{align*} \text{重复执行直到收敛：} \; \lbrace \newline\;
 &b\ \ = b -  \alpha \frac{\partial J(\mathbf{w},b)}{\partial b}  \newline \rbrace
 \end{align*}$$
 
-特征数量为n, 参数$w_j$,  $b$, 同步更新如下
+特征数量为n, 参数$w_j$, $b$, 同步更新如下
 
 $$
 \begin{align}
@@ -183,7 +183,7 @@ $$
    - 通用版：`(x - min) / (max - min)`，适用于任意特征，结果 [0, 1]
    - 两种方式都将特征归一化到 -1 到 1 范围内。
 2. **均值归一化（Mean normalization）**： $x_i := \frac{x_i - \mu_i}{\max - \min}$ ，结果约 [-0.5, 0.5]，数据居中
-3. **Z-score 标准化（Z-score normalization）**： $x^{(i)}_j = \dfrac{x^{(i)}_j - \mu_j}{\sigma_j} \tag{4}$ ，$$j$$ 为某个特征，结果均值 0、方差 1，最常用，其中
+3. **Z-score 标准化（Z-score normalization）**： $x^{(i)}_j = \dfrac{x^{(i)}_j - \mu_j}{\sigma_j} \tag{4}$ ，$j$ 为某个特征，结果均值 0、方差 1，最常用，其中
 
 $$
 \begin{align}
@@ -504,9 +504,9 @@ $$\text{Var}(\text{森林}) = \rho\sigma^2 + \frac{1-\rho}{B}\sigma^2$$
 最终预测 = 所有树的加权求和
 ```
 
-GBDT 每一轮（第 $i$ 棵树）拟合的是：$$ r_i^{(t)} = - \left[ \frac{\partial L(y_i,\hat y_i)} {\partial \hat y_i} \right]_{\hat y_i=\hat y_i^{(t-1)}} $$ 即**损失函数关于预测结果的负梯度**。
+GBDT 每一轮（第 $i$ 棵树）拟合的是：$r_i^{(t)} = - \left[ \frac{\partial L(y_i,\hat y_i)} {\partial \hat y_i} \right]_{\hat y_i=\hat y_i^{(t-1)}}$ 即**损失函数关于预测结果的负梯度**。
 
-对于平方误差损失 $$ L(y,\hat y)=\frac12(y-\hat y)^2 $$ 。求梯度：$$ \frac{\partial L}{\partial \hat y} = \hat y-y $$ ，负梯度就是：$$ -\frac{\partial L}{\partial \hat y} = y-\hat y $$ 刚好就是**残差**。即下一棵树拟合上一轮的残差，每棵新树专门拟合前面所有树预测剩下的"没解释干净的部分"。
+对于平方误差损失 $L(y,\hat y)=\frac12(y-\hat y)^2$ 。求梯度：$\frac{\partial L}{\partial \hat y} = \hat y-y$ ，负梯度就是：$-\frac{\partial L}{\partial \hat y} = y-\hat y$ 刚好就是**残差**。即下一棵树拟合上一轮的残差，每棵新树专门拟合前面所有树预测剩下的"没解释干净的部分"。
 
 ```
 1. 初始化: F₀(x) = 所有 y 的均值（或常数 c 最小化损失）
@@ -533,7 +533,10 @@ $$\mathcal{L} = \underbrace{\sum_i L(y_i, \hat{y}_i)}_{\text{损失}} + \underbr
 
 GBDT 只用**一阶**梯度（负梯度方向）。XGBoost 把损失在当前位置做**二阶泰勒展开**：
 
-$$\mathcal{L}^{(m)} \approx \sum_i \left[g_i f_m(x_i) + \frac12 h_i f_m^2(x_i)\right] + \Omega(f_m)$$ ，其中 $g_i = \frac{\partial L}{\partial \hat{y}_i}$（一阶）、$h_i = \frac{\partial^2 L}{\partial \hat{y}_i^2}$（二阶）。展开后，叶子节点的最优权重： $$ w_j^* = -\frac{\sum_{i \in \text{leaf}_j} g_i}{\sum_{i \in \text{leaf}_j} h_i + \lambda} $$，最优权重带入函数后得到收益，可以快速计算每个候选分裂能降低多少损失（带来多少收益）。
+$$
+\mathcal{L}^{(m)} \approx \sum_i \left[g_i f_m(x_i) + \frac12 h_i f_m^2(x_i)\right] + \Omega(f_m)
+$$
+其中 $g_i = \frac{\partial L}{\partial \hat{y}_i}$（一阶）、$h_i = \frac{\partial^2 L}{\partial \hat{y}_i^2}$（二阶）。展开后，叶子节点的最优权重： $w_j^* = -\frac{\sum_{i \in \text{leaf}_j} g_i}{\sum_{i \in \text{leaf}_j} h_i + \lambda}$，最优权重带入函数后得到收益，可以快速计算每个候选分裂能降低多少损失（带来多少收益）。
 
 ### SVM 支持向量机
 
@@ -1195,16 +1198,6 @@ plt.show()
 
 
 
-
-
-
-
-
-
-
-
-
-
 ## 异常检测（Anomaly Detection）
 
 异常检测的特点在于其假设样本特征服从**高斯分布**（Gaussian Distribution），而异常点通常偏离正常数据，且可能性较低。
@@ -1219,7 +1212,7 @@ $$
 
 - $\mu$ 是样本均值，代表分布的中心；
 - $\sigma^2$ 是样本方差，代表样本偏离中心的程度，$\sigma$ 越小，概率密度曲线就越瘦高；
-- 概率密度函数满足：$$ \int_{-\infty}^{+\infty} P(x;\mu,\sigma^2)\,dx = 1$$
+- 概率密度函数满足：$\int_{-\infty}^{+\infty} P(x;\mu,\sigma^2)\,dx = 1$
 
 ### 多元高斯分布
 
@@ -1360,39 +1353,36 @@ plt.show()
 
 ## 降维（Dimensionality Reduction）
 
-### **主成分分析 **Principal Component Analysis
+### 主成分分析 Principal Component Analysis
 
 #### 推导
 
 目标是找一个最优的 $k$ 维子空间，把原来的 $n$ 维数据投影到这个 $k$ 维子空间后，**损失的信息最少**。
 
-设样本 $x\in\mathbb R^n$，选择一组标准正交基 $u_1,\dots,u_n$，新坐标为 $$ y_r=u_r^Tx. $$，如果只保留前 $k$ 维，那么被丢掉的部分是$$ y_{k+1},\dots,y_n, $$所以单个样本的重构误差为 $$ y_{k+1}^2+\cdots+y_n^2. $$ ，对所有样本，我们希望
+设样本 $x\in\mathbb R^n$，选择一组标准正交基 $u_1,\dots,u_n$，新坐标为 $y_r=u_r^Tx.$，如果只保留前 $k$ 维，那么被丢掉的部分是$y_{k+1},\dots,y_n$，所以单个样本的重构误差为 $y_{k+1}^2+\cdots+y_n^2.$ ，对所有样本，我们希望
 $$
 \min \sum_{i=1}^m\sum_{r=k+1}^n (y_r^{(i)})^2 = \max \sum_{i=1}^m\sum_{r=1}^k(y_r^{(i)})^2 =  \max \sum_{r=1}^k u_r^T X^TXu_r
 $$
-由于正交变换不改变向量长度， $$ \sum_{r=1}^n(y_r^{(i)})^2=\|x^{(i)}\|^2 $$是固定的，所以：**最小化丢失部分 $\iff$ 最大化保留部分**
+由于正交变换不改变向量长度， $\sum_{r=1}^n(y_r^{(i)})^2=\|x^{(i)}\|^2$ 是固定的，所以：**最小化丢失部分 $\iff$ 最大化保留部分**，又因为 $y_r^{(i)}=u_r^Tx^{(i)}$，所以
 
-又因为 $$ y_r^{(i)}=u_r^Tx^{(i)}, $$所以
 $$
 \sum_{i=1}^m(y_r^{(i)})^2 = u_r^T \left( \sum_{i=1}^m x^{(i)}x^{(i)T} \right) u_r = u_r^T X^TXu_r
 $$
-若数据矩阵 $X$ 的每一行是一个样本，于是问题变成： $$ \max \sum_{r=1}^k u_r^T X^TXu_r, $$
+若数据矩阵 $X$ 的每一行是一个样本，于是问题变成： $\max \sum_{r=1}^k u_r^T X^TXu_r$
 
-接下来对 $$ X^TX $$，做特征分解：$$ X^TX=Q\Lambda Q^T, $$其中 $$ \lambda_1\ge\lambda_2\ge\cdots\ge\lambda_n, $$对应特征向量为$$ q_1,q_2,\dots,q_n. $$
+接下来对 $X^TX$，做特征分解：$X^TX=Q\Lambda Q^T$, 其中 $\lambda_1\ge\lambda_2\ge\cdots\ge\lambda_n$对应特征向量为$q_1,q_2,\dots,q_n$
 
-因此 PCA 的最优 $k$ 维子空间就是 $$ \operatorname{span}\{q_1,\dots,q_k\} $$ ，也就是：$$ X^TX $$ 最大 $$ k $$ 个特征值对应的特征向量，组成投影矩阵
+因此 PCA 的最优 $k$ 维子空间就是 $\operatorname{span}\{q_1,\dots,q_k\}$ ，也就是：$X^TX$ 最大 $k$ 个特征值对应的特征向量，组成投影矩阵 $C=[q_1,\dots,q_k].$ 最终降维：$Z=XC$
 
-$$ C=[q_1,\dots,q_k]. $$ 最终降维：$$ Z=XC $$
-
-实际 PCA 一般先对数据中心化，所以 $X^TX$ 与协方差矩阵只差一个常数倍，因此也常说：PCA 就是求**协方差矩阵最大的 $$ k $$ 个特征向量**
+实际 PCA 一般先对数据中心化，所以 $X^TX$ 与协方差矩阵只差一个常数倍，因此也常说：PCA 就是求**协方差矩阵最大的 $k$ 个特征向量**
 
 #### 算法步骤
 
-1. 计算矩阵 $$ X^TX $$或者样本的协方差矩阵
+1. 计算矩阵 $X^TX$或者样本的协方差矩阵
 2. 进行奇异值分解，得到奇异向量
-3. 选取前 $k$ 个奇异向量作为降维后的空间的基向量，构成基变换矩阵 $$ C_{n\times k} $$
+3. 选取前 $k$ 个奇异向量作为降维后的空间的基向量，构成基变换矩阵 $C_{n\times k}$
 
-4. 对于原数据 $\mathbf{x}$，取 $$ \mathbf{z}=\mathbf{C}^T\mathbf{x} $$ 为其降维后的数据。更简单的表达是取 $$ \mathbf{Z}_{m\times k} = \mathbf{X}_{m\times n}\mathbf{C}_{n\times k} $$，则 $\mathbf{Z}_{m\times k}$ 是降维后的数据集。
+4. 对于原数据 $\mathbf{x}$，取 $\mathbf{z}=\mathbf{C}^T\mathbf{x}$ 为其降维后的数据。更简单的表达是取 $\mathbf{Z}_{m\times k} = \mathbf{X}_{m\times n}\mathbf{C}_{n\times k}$，则 $\mathbf{Z}_{m\times k}$ 是降维后的数据集。
 
 
 > PCA 的算法过程中完全无超参数参与，不需要人为进行干预，最后的结果只与数据有关。这既是优点也是缺点，缺点在于难以利用已有先验进行额外的干预。
@@ -1405,7 +1395,7 @@ $$ C=[q_1,\dots,q_k]. $$ 最终降维：$$ Z=XC $$
 
 #### 主成分数量的选择
 
-定义一个**平均误差**为： $$ \frac{1}{m}\sum_{i=1}^{m} \left\| \mathbf{x}^{(i)}-\mathbf{x}_{\mathrm{approx}}^{(i)}\right\|^2 $$ ，其中，$\mathbf{x}_{\mathrm{approx}}^{(i)}$ 表示数据 $\mathbf{x}^{(i)}$ 在我们找到的 $k$ 维子空间上的投影。再定义一个**总方差**为：$$ \frac{1}{m}\sum_{i=1}^{m} \left\| \mathbf{x}^{(i)} \right\|^2 $$
+定义一个**平均误差**为： $\frac{1}{m}\sum_{i=1}^{m} \left\| \mathbf{x}^{(i)}-\mathbf{x}_{\mathrm{approx}}^{(i)}\right\|^2$ ，其中，$\mathbf{x}_{\mathrm{approx}}^{(i)}$ 表示数据 $\mathbf{x}^{(i)}$ 在我们找到的 $k$ 维子空间上的投影。再定义一个**总方差**为：$\frac{1}{m}\sum_{i=1}^{m} \left\| \mathbf{x}^{(i)} \right\|^2$
 
 则一般的，我们会选择最小的 $k$ 使得：
 
