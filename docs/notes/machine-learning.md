@@ -1196,6 +1196,81 @@ plt.show()
 
 ![k-means](../assets/notes/machine-learning/20260928144045384.png)
 
+### DBSCAN
+
+DBSCAN 是一种经典的**基于密度的聚类算法**，全称是 Density-Based Spatial Clustering of Applications with Noise，中文通常称为“具有噪声的基于密度的空间聚类算法”。
+
+#### 算法
+
+1. 选定一个数据点。
+2. 查看这个点周围一定范围内有多少个邻居。
+3. 如果邻居足够多，就认为这个点处于高密度区域。
+4. 从这个点出发，继续寻找相邻的高密度区域。
+5. 将相互连接的高密度区域扩展为一个完整的簇。
+6. 无法归入任何簇的点，最终可能成为噪声点。
+
+* ε（Epsilon）：邻域半径，定义一个点周围多大的范围属于它的邻域
+* MinPts：最小邻域点数，一个点的 ε 邻域中，至少需要包含多少个数据点，才能被认定为核心点。
+
+#### 代码
+
+```python
+import sys
+from collections import deque
+
+eps, min_samples, x = input().split()
+eps = float(eps)
+min_samples, x = int(min_samples), int(x)
+
+points = []
+for i in range(x):
+    nums = list(map(float, input().split()))
+    points.append(nums)
+
+
+def dbscan(points, eps, min_pts):
+    n = len(points)
+    neighbors = [[] for _ in range(n)]
+    # 计算领域
+    for i in range(n):
+        for j in range(n):
+            dist = 0
+            for x, y in zip(points[i], points[j]):
+                dist += (x - y) ** 2
+            if dist <= eps ** 2:
+                neighbors[i].append(j)
+    
+    st = [-1] * n
+    # print(neighbors)
+    c = 0
+    for i in range(n):
+        if st[i] != -1:
+            continue
+        
+        cur_ne = neighbors[i]
+        # 可能为边界点或噪声点
+        if len(cur_ne) < min_pts:
+            continue
+        
+        st[i] = c
+        que = deque(cur_ne)
+        while que:
+            a = que.popleft()
+            if st[a] != -1:
+                continue
+            st[a] = c
+            if len(neighbors[a]) >= min_pts:
+                que.extend(neighbors[a])
+        c += 1
+        # print(st)  
+    return st
+
+label = dbscan(points, eps, min_samples)
+clu = set(label) - {-1}
+cnt_nos = label.count(-1)
+print(f"{len(clu)} {cnt_nos}")
+```
+
 
 
 ## 异常检测（Anomaly Detection）
