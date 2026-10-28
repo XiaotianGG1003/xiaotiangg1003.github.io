@@ -1019,8 +1019,8 @@ int Query(char *str) {
     }
 
     // 合并a和b所在的两个集合：
+	d[find(a)] = distance; // 根据具体问题，初始化find(a)的偏移量
     p[find(a)] = find(b);
-    d[find(a)] = distance; // 根据具体问题，初始化find(a)的偏移量
 ```
 
 
