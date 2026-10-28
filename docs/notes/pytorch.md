@@ -739,6 +739,53 @@ optimizer.zero_grad()	# 把上一轮 loss 关于 weight 的梯度变成 0，防�
 optimizer.step()		# 进行一次优化迭代，即 x += Δ 的过程
 ```
 
+#### 调度器
+
+注意到上述优化器参数都有一个固定的 `lr`  ,优化器不改变基准 lr，它对每个参数的梯度做独立自适应缩放，改变每一步梯度更新的步长，而调度器每一步修改优化器当前使用的 lr，是作用于全部参数的全局缩放。
+
+```python
+optimizer = optim.SGD(model.parameters(), lr=lr, weight_decay=1e-4)
+# verbose=True 表示每次更新都会输出一条信息，适用于所有调度器
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, verbose=True)
+
+for epoch in range(num_epochs):
+	for X, y in train_set:
+		optimizer.zero_grad()
+        pred = model(X)
+        loss = criterion(pred, y)
+        loss.backward()
+        optimizer.step()
+        # 调度器工作，每个 step 调度一次
+        # scheduler.step()	
+    scheduler.step()					# 调度器工作，每个 epoch 调度一次
+```
+
+还有许多不同的调度器，可以**有规律地间隔调整**，或者**根据指标的变化情况**调整。
+
+```python
+# 等间隔调整，每隔 step_size 个 epoch，调整为 lr * gamma
+optim.lr_scheduler.StepLR(optimizer, step_size, gamma=0.1)
+# 多间隔调整，milestones 传入参数列表，表示在第几个 epoch 更新
+optim.lr_scheduler.MultiStepLR(optimizer, milestones, gamma=0.1)
+# 指数衰减调整，每个 epoch 更新为 lr * gamma ^ epoch，gamma 一般设为 0.9
+optim.lr_scheduler.ExponentialLR(optimizer, gamma)
+# 余弦退火函数调整，走势类似 cos(x)，当 epoch = T_max 时，学习率取最低点 eta_min
+optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max, eta_min=0)
+
+# 根据指标调整，当给定指标在最近 patience 个 epoch 中都没有变化，学习率下降
+optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
+scheduler.step(val_loss) 	# loss 对应 mode='min'，表示当指标不再降低时更新
+scheduler.step(val_acc) 	# acc 对应 mode='max'，表示当指标不再升高时更新
+
+# 自定义倍率调整，通过匿名函数为不同参数组设置不同规则，更新为 lr * lambda(epoch)
+optimizer = optim.SGD([{'params': base_params},
+        			   {'params': net.fc.parameters(), 'lr': 1e-2}],
+                      lr=1e-3, momentum=0.9, weight_decay=1e-4)
+lambda1 = lambda epoch: epoch // 3
+lambda2 = lambda epoch: 0.95 ** epoch
+scheduler = LambdaLR(optimizer, lr_lambda=[lambda1, lambda2])
+```
+
 ### 评估阶段
 
 使用`model.eval()`开启，开启后 Dropout、BatchNorm 等模块会有所区别。配合使用 `with torch.no_grad():` 防止PyTorch 自动对张量进行梯度计算
