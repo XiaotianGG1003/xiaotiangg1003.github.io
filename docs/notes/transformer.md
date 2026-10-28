@@ -49,6 +49,8 @@ class Transformer(nn.Module):
 
 ## Multi-Head Attention
 
+MHA（Multi-Head Attention，多头注意力）会将注意力计算分成多个头，每个头可以学习不同的信息关系。
+
 ```python
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_model, num_heads):
@@ -85,6 +87,92 @@ class MultiHeadAttention(nn.Module):
         output = output.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
         output = self.W_o(output)
         return output
+```
+
+## Multi-Query Attention
+
+为了减少 Key 和 Value 的存储与读取开销，降低 KV Cache 占用，对多头注意力做了许多改进
+
+MQA（Multi-Query Attention，多查询注意力），每一层Transoformer中多个Query头共用一组K、V，模型的表达能力可能有所下降
+
+```python
+class MultiQueryAttention(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super().__init__()
+        self.d_k = d_model // num_heads
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, self.d_k)
+        self.W_v = nn.Linear(d_model, self.d_k)
+        self.W_o = nn.Linear(d_model, d_model)
+
+    def forward(self, Q, K, V, mask=None):
+        batch_size = Q.shape[0]
+        # 多个Query头共用一份K V
+        # (batch_size, seq_len, d_model) -> (batch_size, num_heads, seq_len, d_k)
+        Q = self.W_q(Q).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+        K = self.W_k(K).view(batch_size, -1, 1, self.d_k).transpose(1, 2)
+        V = self.W_v(V).view(batch_size, -1, 1, self.d_k).transpose(1, 2)
+
+        attn = (Q @ K.transpose(-1, -2)) / math.sqrt(self.d_k)
+        if mask is not None:
+            attn = attn.masked_fill(mask == 0, -1e9)
+        attn_score = torch.softmax(attn, dim=-1)
+
+        # (batch_size, num_heads, seq_len, d_k) -> (batch_size, seq_len, d_model)
+        output = attn_score @ V
+        output = output.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
+        output = self.W_o(output)
+        return output
+
+```
+
+## Grouped-Query Attention
+
+GQA（Grouped-Query Attention，分组查询注意力），将Query头分为 $g$ 组 $(1 <= g <= h)$，每组内共享一份K、V，在模型能力和压缩效率之间做取舍。
+
+* 当 $g = 1$ 时为 MHA，$g = h$ 时为MHA
+
+```python
+class GroupedQueryAttention(nn.Module):
+    def __init__(self, d_model, num_heads, num_groups):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.num_groups = num_groups
+        self.d_k = d_model // num_heads
+
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, self.d_k * num_groups)
+        self.W_v = nn.Linear(d_model, self.d_k * num_groups)
+        self.W_o = nn.Linear(d_model, d_model)
+
+    def forward(self, Q, K, V, mask=None):
+        batch_size = Q.shape[0]
+        # (batch_size, seq_len, d_model) -> (batch_size, num_heads, seq_len, d_k)
+        Q = self.W_q(Q).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+
+        # (batch_size, seq_len, d_k * num_groups) -> (batch_size, num_groups, seq_len, d_k)
+        K = self.W_k(K).view(batch_size, -1, self.num_groups, self.d_k).transpose(1, 2)
+        # (batch_size, num_groups, seq_len, d_k) -> (batch_size, num_groups, num_heads/num_groups, seq_len, d_k)
+        # (batch_size, num_groups, num_heads / num_groups, seq_len, d_k) ->(batch_size, num_heads, seq_len, d_k)
+        K = (K[:, :, None, :, :].expand(batch_size, self.num_groups, self.num_heads // self.num_groups, -1, self.d_k)
+             .reshape(batch_size, self.num_heads, -1, self.d_k))
+
+        V = self.W_v(V).view(batch_size, -1, self.num_groups, self.d_k).transpose(1, 2)
+        V = (V[:, :, None, :, :].expand(batch_size, self.num_groups, self.num_heads // self.num_groups, -1, self.d_k)
+             .reshape(batch_size, self.num_heads, -1, self.d_k))
+
+        attn = (Q @ K.transpose(-1, -2)) / math.sqrt(self.d_k)
+        if mask is not None:
+            attn = attn.masked_fill(mask==0, -1e9)
+        attn_score = torch.softmax(attn, dim=-1)
+
+        # (batch_size, num_heads, seq_len, d_k) -> (batch_size, seq_len, d_model)
+        output = (attn_score @ V).transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
+
+        return self.W_o(output)
 ```
 
 ## Encoder
@@ -201,6 +289,20 @@ class PositionalEncoding(nn.Module):
 ```
 
 ## 面试题
+
+### 0.Transformer与RNN对比
+
+Transformer与RNN是两种序列seq到序列seq的的架构模型，RNN 通过循环状态逐步处理序列，Transformer 通过注意力机制直接建模序列中不同位置之间的关系。
+
+RNN：对于序列中第t个 token，其隐藏状态 $h_t$由当前输入$x_t$和上一时刻隐藏状态$h_{t-1}$共同计算： $h_t = \sigma(W_h h_{t-1} + W_x x_t + b)$ ，信息沿时间步有序单向传递
+
+Transformer：将输入映射为查询（Q）、键（K）、值（V）三个向量，通过 Q 与 K 点乘计算相似度权重，对 V 加权求和得到融合全局上下文的表征，采用**多头注意力**在多个特征子空间捕捉不同类型的语义依赖，配合残差连接与层归一化，支持深层堆叠。无时间依赖和位置信息，必须引入位置编码，支持并行计算和矩阵计算优化
+
+|                | Transformer                                | RNN                                     |
+| -------------- | ------------------------------------------ | --------------------------------------- |
+| 并行计算能力   | 编码器解码器在训练可并行，矩阵运算容易优化 | 训练无法并行，必须按时间步逐个计算      |
+| 长距离捕捉能力 | 直接建模不同位置信息                       | 序列越长，信息衰减越严重                |
+| 梯度传播       | 配合残差连接与层归一化，支持深层堆叠       | 每次要乘以梯度矩阵，会导致梯度消失/爆炸 |
 
 ### 1.Transformer为何使用多头注意力机制？（为什么不使用一个头）
 
