@@ -132,7 +132,7 @@ class MultiQueryAttention(nn.Module):
 
 GQA（Grouped-Query Attention，分组查询注意力），将Query头分为 $g$ 组 $(1 <= g <= h)$，每组内共享一份K、V，在模型能力和压缩效率之间做取舍。
 
-* 当 $g = 1$ 时为 MHA，$g = h$ 时为MHA
+* 当 $g = 1$ 时为 MQA，$g = h$ 时为 MHA
 
 ```python
 class GroupedQueryAttention(nn.Module):
