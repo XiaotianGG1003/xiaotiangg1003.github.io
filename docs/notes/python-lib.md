@@ -223,6 +223,7 @@ np.setxor1d(a, b)	# 只属于其中一方的元素
 # axis：指定计算的轴
 # keepdims：是否保留被计算的维度
 np.linalg.norm(x, ord, axis, keepdims=False) # 向量或矩阵范数
+np.linalg.inv(A)	# 求逆矩阵
 ```
 
 ### 排序、去重、判断
@@ -261,6 +262,9 @@ print(counts)  # [1, 2, 3]
 any(a > 0, axis) # 至少有一个元素满足条件，就返回 True。
 all(a > 0, axis) # 所有元素都满足条件，才返回 True
 (a > 0).all()	 # 检查是否全为正
+
+np.isclose(a, b)	# 逐元素判断是否接近，返回布尔值或布尔数组
+np.allclose(a, b, rtol=1e-5, atol=1e-8)		# 判断所有对应元素是否都接近，返回单个布尔值
 ```
 
 ### 随机数生成
